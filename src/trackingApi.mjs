@@ -157,6 +157,34 @@ function readLogTitle(log) {
   return log.status || log.action || log.title || log.current_status || log.next_status || '';
 }
 
+function normalizeVietnameseText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .trim();
+}
+
+function isNoiseTimelineTitle(title) {
+  const text = normalizeVietnameseText(title);
+  const raw = String(title || '').toLowerCase();
+  return (
+    text.includes('khoi tao don hang') ||
+    text.includes('goi hen') ||
+    text.includes('goi khach') ||
+    text.includes('call') ||
+    text.includes('sms') ||
+    raw.includes('khởi tạo') ||
+    raw.includes('khá»') ||
+    raw.includes('gá»i') ||
+    raw.includes('kh?i')
+  );
+}
+
+function pickFirstMeaningful(values) {
+  return values.find(Boolean) || '';
+}
+
 function readLogDetail(log) {
   const locationParts = [
     log.updated_warehouse,
@@ -220,6 +248,55 @@ function buildTimeline(order) {
     });
 }
 
+function buildEventFamily(title) {
+  const text = normalizeVietnameseText(title);
+
+  if (text.includes('giao thanh cong') || text.includes('giao hang thanh cong') || text.includes('delivered')) return 'delivered';
+  if (text.includes('da tra') || text.includes('returned')) return 'returned';
+  if (text.includes('du kien giao hang')) return 'leadtime';
+  if (text.includes('dang giao')) return 'delivering';
+  if (text.includes('luan chuyen')) return 'transporting';
+  if (text.includes('luu kho') || text.includes('phan loai')) return 'warehouse';
+  if (text.includes('lay hang')) return 'picking';
+  return text;
+}
+
+function cleanTimelineDetail(detail) {
+  return String(detail || '')
+    .split(/ · | Â· /)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .slice(0, 2)
+    .join(' · ');
+}
+
+export function buildTimelineForDisplay(order) {
+  const seenFamilyMoments = new Set();
+  const seenSingleFamilies = new Set();
+
+  return buildTimeline(order)
+    .filter((event) => !isNoiseTimelineTitle(event.title))
+    .map((event) => ({
+      ...event,
+      detail: cleanTimelineDetail(event.detail),
+    }))
+    .filter((event) => {
+      const family = buildEventFamily(event.title);
+      if (family === 'delivered' || family === 'returned' || family === 'leadtime') {
+        if (seenSingleFamilies.has(family)) return false;
+        seenSingleFamilies.add(family);
+        return true;
+      }
+
+      if (family === 'delivering') {
+        const familyMoment = `${family}|${event.time}`;
+        if (seenFamilyMoments.has(familyMoment)) return false;
+        seenFamilyMoments.add(familyMoment);
+      }
+      return true;
+    });
+}
+
 function normalizeGhnResponse(data, carrier, code, lookupMode) {
   const order = data?.data || {};
   const status = order.status || order.current_status || '';
@@ -245,7 +322,7 @@ function normalizeGhnResponse(data, carrier, code, lookupMode) {
     ].filter(Boolean).join(' · ') || data?.message || 'Đã nhận dữ liệu từ GHN.',
     from_location: order.from_location || null,
     to_location: order.to_location || null,
-    events: buildTimeline(order),
+    events: buildTimelineForDisplay(order),
     raw: data,
   };
 }

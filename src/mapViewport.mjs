@@ -10,10 +10,21 @@ function pointsAreNear(a, b, threshold = VISUAL_OVERLAP_THRESHOLD) {
 }
 
 export function buildMarkerDisplayState(truckPoint, recipientPoint) {
+  const options = arguments[2] || {};
+  const { delivered = false } = options;
+
   if (!truckPoint || !recipientPoint) {
     return {
-      truckDisplayPoint: truckPoint || null,
+      truckDisplayPoint: delivered ? null : truckPoint || null,
       recipientDisplayPoint: recipientPoint || null,
+      hasVisualSeparation: false,
+    };
+  }
+
+  if (delivered) {
+    return {
+      truckDisplayPoint: null,
+      recipientDisplayPoint: { ...recipientPoint },
       hasVisualSeparation: false,
     };
   }

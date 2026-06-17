@@ -1222,6 +1222,30 @@ function pointsSignature(points) {
     .join('|');
 }
 
+function normalizeStatusText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase();
+}
+
+function isDeliveredResult(result, journey) {
+  const candidates = [
+    result?.status,
+    result?.events?.[0]?.title,
+    journey?.currentCheckpoint?.title,
+  ]
+    .filter(Boolean)
+    .map(normalizeStatusText);
+
+  return candidates.some((text) =>
+    text.includes('giao thanh cong') ||
+    text.includes('da tra') ||
+    text.includes('delivered') ||
+    text.includes('returned')
+  );
+}
+
 function getSegmentStyle(status) {
   if (status === 'completed') {
     return { color: '#7fc2ff', weight: 4.5, opacity: 0.82 };
@@ -1442,20 +1466,27 @@ async function renderRoadJourneyMap(result) {
 
   const truckIcon = createEmojiMarkerIcon({ emoji: '🚚', className: 'map-emoji-marker--truck' });
   const recipientIcon = createEmojiMarkerIcon({ emoji: '🤵‍♂️', className: 'map-emoji-marker--recipient' });
+  const deliveredRecipientIcon = createEmojiMarkerIcon({ emoji: '🤵‍♂️📦', className: 'map-emoji-marker--recipient map-emoji-marker--recipient-delivered' });
+  const isDeliveredJourney = isDeliveredResult(result, journey);
 
-  const markerDisplayState = buildMarkerDisplayState(journey.current, journey.destination);
+  const markerDisplayState = buildMarkerDisplayState(journey.current, journey.destination, { delivered: isDeliveredJourney });
 
   destinationMarker = L.marker([markerDisplayState.recipientDisplayPoint.lat, markerDisplayState.recipientDisplayPoint.lng], {
-    icon: recipientIcon,
+    icon: isDeliveredJourney ? deliveredRecipientIcon : recipientIcon,
     zIndexOffset: 500,
   }).addTo(leafletMap);
-  destinationMarker.bindPopup('<b>Vi tri nguoi nhan</b>');
+  destinationMarker.bindPopup(isDeliveredJourney ? '<b>Nguoi nhan da nhan hang</b>' : '<b>Vi tri nguoi nhan</b>');
 
-  truckMarker = L.marker([markerDisplayState.truckDisplayPoint.lat, markerDisplayState.truckDisplayPoint.lng], {
-    icon: truckIcon,
-    zIndexOffset: 1000,
-  }).addTo(leafletMap);
-  truckMarker.bindPopup('<b>Vi tri xe hien tai</b>');
+  truckMarker = markerDisplayState.truckDisplayPoint
+    ? L.marker([markerDisplayState.truckDisplayPoint.lat, markerDisplayState.truckDisplayPoint.lng], {
+        icon: truckIcon,
+        zIndexOffset: 1000,
+      }).addTo(leafletMap)
+    : null;
+
+  if (truckMarker) {
+    truckMarker.bindPopup('<b>Vi tri xe hien tai</b>');
+  }
 
   await renderSegmentedJourney(journey);
   fitSegmentedJourney(leafletMap, journey);

@@ -38,3 +38,15 @@ test('viewport focus is driven by the truck and recipient markers only', () => {
     [21.5927453, 103.4238921],
   ]);
 });
+
+test('delivered state keeps only the recipient marker visible on the map', () => {
+  const state = buildMarkerDisplayState(
+    { lat: 10.857213, lng: 106.7081402 },
+    { lat: 10.857213, lng: 106.7081402 },
+    { delivered: true },
+  );
+
+  assert.equal(state.truckDisplayPoint, null);
+  assert.deepEqual(state.recipientDisplayPoint, { lat: 10.857213, lng: 106.7081402 });
+  assert.equal(state.hasVisualSeparation, false);
+});

@@ -70,6 +70,13 @@ test('destination marker stays on the recipient icon while truck focus only repo
   assert.doesNotMatch(appSource, /truckMarker\.setIcon\(recipientIcon\)/);
 });
 
+test('delivered map state swaps to a recipient-plus-package marker and removes the truck marker', () => {
+  assert.match(appSource, /const deliveredRecipientIcon = createEmojiMarkerIcon\(\{[^}]*emoji:\s*'🤵‍♂️📦'/);
+  assert.match(appSource, /const isDeliveredJourney = isDeliveredResult\(result,\s*journey\)/);
+  assert.match(appSource, /icon:\s*isDeliveredJourney\s*\?\s*deliveredRecipientIcon\s*:\s*recipientIcon/);
+  assert.match(appSource, /truckMarker = markerDisplayState\.truckDisplayPoint\s*\?/);
+});
+
 test('styles distinguish interactive and static timeline checkpoints', () => {
   assert.match(styles, /\.timeline__item\[data-map-interactive="true"\]::after/);
   assert.match(styles, /\.timeline__item--static\b/);
