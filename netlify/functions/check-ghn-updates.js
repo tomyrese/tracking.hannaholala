@@ -82,13 +82,18 @@ function hasMeaningfulChanges(currentOrders, latestOrders) {
   return false;
 }
 
-async function triggerBuildHook() {
+export async function triggerBuildHook(fetchImpl = fetch) {
   const buildHookUrl = process.env.NETLIFY_BUILD_HOOK_URL;
   if (!buildHookUrl) {
-    throw new Error('Missing NETLIFY_BUILD_HOOK_URL.');
+    console.warn('[Scheduled Sync] Skipping build hook trigger because NETLIFY_BUILD_HOOK_URL is not configured.');
+    return {
+      triggered: false,
+      skipped: true,
+      reason: 'missing_build_hook_url',
+    };
   }
 
-  const response = await fetch(buildHookUrl, {
+  const response = await fetchImpl(buildHookUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: '{}',
@@ -98,27 +103,46 @@ async function triggerBuildHook() {
     const text = await response.text();
     throw new Error(`Build hook returned HTTP ${response.status}: ${text}`);
   }
+
+  return {
+    triggered: true,
+    skipped: false,
+    reason: null,
+  };
+}
+
+export async function runScheduledSync({
+  readCurrentOrders = readBundledOrders,
+  readLatestOrders = fetchLatestGhnOrders,
+  triggerRebuild = triggerBuildHook,
+} = {}) {
+  const [currentOrders, latestOrders] = await Promise.all([
+    readCurrentOrders(),
+    readLatestOrders(),
+  ]);
+
+  const rebuildNeeded = hasMeaningfulChanges(currentOrders, latestOrders);
+  const buildHook = rebuildNeeded
+    ? await triggerRebuild()
+    : { triggered: false, skipped: false, reason: null };
+
+  return {
+    checkedAt: new Date().toISOString(),
+    latestCount: latestOrders.length,
+    currentCount: currentOrders.length,
+    rebuildNeeded,
+    rebuildTriggered: buildHook.triggered,
+    buildHookSkipped: buildHook.skipped,
+    buildHookReason: buildHook.reason,
+  };
 }
 
 export default async function handler() {
   try {
-    const [currentOrders, latestOrders] = await Promise.all([
-      readBundledOrders(),
-      fetchLatestGhnOrders(),
-    ]);
-
-    const shouldRebuild = hasMeaningfulChanges(currentOrders, latestOrders);
-
-    if (shouldRebuild) {
-      await triggerBuildHook();
-    }
-
+    const result = await runScheduledSync();
     return json(200, {
       ok: true,
-      checkedAt: new Date().toISOString(),
-      latestCount: latestOrders.length,
-      currentCount: currentOrders.length,
-      rebuildTriggered: shouldRebuild,
+      ...result,
     });
   } catch (error) {
     console.error('[Scheduled Sync] Failed:', error);
