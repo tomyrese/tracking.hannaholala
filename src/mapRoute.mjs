@@ -53,6 +53,25 @@ function isPointInVietnam(lat, lng) {
   return isPointInPolygon(lat, lng, VIETNAM_POLYGON);
 }
 
+function routeLeavesVietnamMeaningfully(points) {
+  let outsideCount = 0;
+  let currentOutsideRun = 0;
+  let longestOutsideRun = 0;
+
+  for (const [lat, lng] of points) {
+    if (isPointInVietnam(lat, lng)) {
+      currentOutsideRun = 0;
+      continue;
+    }
+
+    outsideCount += 1;
+    currentOutsideRun += 1;
+    longestOutsideRun = Math.max(longestOutsideRun, currentOutsideRun);
+  }
+
+  return outsideCount >= 3 || longestOutsideRun >= 2 || outsideCount / points.length > 0.35;
+}
+
 export async function fetchRoadRoute(fetchImpl, start, end) {
   const fallbackRoute = [
     [start.lat, start.lng],
@@ -80,7 +99,7 @@ export async function fetchRoadRoute(fetchImpl, start, end) {
     }
 
     const mappedCoordinates = coordinates.map(([lng, lat]) => [lat, lng]);
-    if (mappedCoordinates.some(([lat, lng]) => !isPointInVietnam(lat, lng))) {
+    if (routeLeavesVietnamMeaningfully(mappedCoordinates)) {
       return fallbackRoute;
     }
 
