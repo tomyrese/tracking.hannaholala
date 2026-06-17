@@ -481,9 +481,9 @@ h1 {
 }
 
 .status-head {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: flex-start;
-  justify-content: space-between;
   gap: 12px;
   margin-bottom: 16px;
 }
@@ -544,7 +544,8 @@ h1 {
   justify-content: flex-start;
   gap: 8px;
   flex: 0 0 auto;
-  margin-left: auto;
+  justify-self: end;
+  min-width: max-content;
 }
 
 .status-actions {
@@ -880,17 +881,17 @@ h1 {
   }
 
   .status-head {
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: flex-start;
-    flex-direction: column;
   }
 
   .status-title {
-    width: 100%;
+    min-width: 0;
   }
 
   .status-side {
-    width: 100%;
     align-items: flex-end;
+    justify-self: end;
   }
 
   .code-pill {
