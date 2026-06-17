@@ -121,3 +121,39 @@ test('builds timeline checkpoints and marks the newest checkpoint segment as act
   assert.deepEqual(journey.segments.at(-1).from, { lat: 10.8, lng: 106.8 });
   assert.deepEqual(journey.segments.at(-1).to, { lat: 10.9, lng: 106.9 });
 });
+
+test('keeps checkpoint detail for real coordinate events such as warehouse updates', () => {
+  const result = {
+    from_location: { lat: 10.1, long: 106.1 },
+    to_location: { lat: 10.9, long: 106.9 },
+    events: [
+      { title: 'Luu kho', detail: 'Kho Ha Noi - Long Bien', lat: 10.6, lng: 106.6, time: '10:00' },
+      { title: 'Dang luan chuyen', detail: 'Hub Bac Ninh', lat: 10.4, lng: 106.4, time: '09:00' },
+      { title: 'Cap nhat van ban khong co GPS', detail: 'Chi co text' },
+    ],
+  };
+
+  const journey = buildMapJourney(result, { lat: 0, lng: 0 }, { lat: 1, lng: 1 });
+
+  assert.equal(journey.checkpoints.length, 2);
+  assert.equal(journey.checkpoints[0].detail, 'Kho Ha Noi - Long Bien');
+  assert.equal(journey.checkpoints[1].detail, 'Hub Bac Ninh');
+});
+
+test('marks only the newest real checkpoint segment as active while older route segments become completed', () => {
+  const result = {
+    from_location: { lat: 10.1, long: 106.1 },
+    to_location: { lat: 10.9, long: 106.9 },
+    events: [
+      { title: 'Luu kho', detail: 'Kho Ha Noi', lat: 10.8, lng: 106.8, time: '10:00' },
+      { title: 'Dang luan chuyen', detail: 'Hub Hai Duong', lat: 10.5, lng: 106.5, time: '09:00' },
+      { title: 'Da lay hang', detail: 'Kho xuat phat', lat: 10.2, lng: 106.2, time: '08:00' },
+    ],
+  };
+
+  const journey = buildMapJourney(result, { lat: 0, lng: 0 }, { lat: 1, lng: 1 });
+
+  assert.equal(journey.segments.filter((segment) => segment.status === 'active').length, 1);
+  assert.equal(journey.segments.filter((segment) => segment.status === 'completed').length, 3);
+  assert.equal(journey.segments.filter((segment) => segment.status === 'upcoming').length, 0);
+});

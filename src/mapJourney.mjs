@@ -56,6 +56,7 @@ export function buildMapJourney(result, fallbackOrigin, fallbackDestination) {
         detail: event.detail || '',
         timelineIndex,
         kind: 'event',
+        isCurrent: timelineIndex === 0,
       };
     })
     .filter(Boolean);

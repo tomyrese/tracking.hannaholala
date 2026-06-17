@@ -158,7 +158,21 @@ function readLogTitle(log) {
 }
 
 function readLogDetail(log) {
-  return log.note || log.reason || log.message || log.location || log.warehouse || log.driver_name || '';
+  const locationParts = [
+    log.updated_warehouse,
+    log.warehouse,
+    log.location,
+    log.address,
+  ].filter(Boolean);
+
+  const messageParts = [
+    log.note,
+    log.reason,
+    log.message,
+    log.driver_name,
+  ].filter(Boolean);
+
+  return [...locationParts, ...messageParts].join(' · ');
 }
 
 function buildTimeline(order) {

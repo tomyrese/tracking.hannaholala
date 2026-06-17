@@ -1197,12 +1197,12 @@ function createCheckpointIcon(status = 'upcoming') {
 
 function getSegmentStyle(status) {
   if (status === 'completed') {
-    return { color: '#8da7d1', weight: 4, opacity: 0.32 };
+    return { color: '#b9dcff', weight: 4, opacity: 0.55 };
   }
   if (status === 'active') {
-    return { color: '#3b82f6', weight: 6, opacity: 0.92 };
+    return { color: '#1479ff', weight: 6, opacity: 0.96 };
   }
-  return { color: '#d5deed', weight: 4, opacity: 0.6 };
+  return { color: '#4da3ff', weight: 4.5, opacity: 0.88 };
 }
 
 function focusTimelineCheckpoint(index) {

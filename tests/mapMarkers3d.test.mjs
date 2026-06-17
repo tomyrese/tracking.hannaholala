@@ -21,3 +21,14 @@ test('styles define emoji marker chips and interactive checkpoint states', () =>
   assert.match(styles, /\.map-checkpoint-dot\b/);
   assert.match(styles, /\.timeline__item\[data-timeline-event\]\.active-event\b/);
 });
+
+test('segment route styles use a blue-water palette for upcoming, active, and completed progress', () => {
+  assert.match(appSource, /color:\s*'#4da3ff'/);
+  assert.match(appSource, /color:\s*'#1479ff'/);
+  assert.match(appSource, /color:\s*'#b9dcff'/);
+});
+
+test('segmented journey binds popup text from checkpoint detail', () => {
+  assert.match(appSource, /checkpoint\.detail/);
+  assert.match(appSource, /checkpoint\.title/);
+});
