@@ -622,48 +622,9 @@ let leafletMap = null;
 let truckMarker = null;
 let destinationMarker = null;
 let originMarker = null;
-let routePolyline = null;
-let animTargetLat = 0;
-let animTargetLng = 0;
-let animCurrentLat = 0;
-let animCurrentLng = 0;
-let animFrameId = null;
-
-// Custom Marker Icons
-let mapTruckIcon = null;
-let mapWarehouseIcon = null;
-let mapCheckIcon = null;
-let mapBoxIcon = null;
-
-// User Geolocation State
+let checkpointMarkers = [];
+let segmentPolylines = [];
 let userLocation = null;
-
-if (navigator.geolocation) {
-  navigator.geolocation.getCurrentPosition(
-    (position) => {
-      userLocation = {
-        lat: position.coords.latitude,
-        lng: position.coords.longitude
-      };
-    },
-    (err) => {
-      console.warn('Geolocation failed:', err);
-    },
-    { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-  );
-}
-
-function getDistanceInKm(lat1, lon1, lat2, lon2) {
-  const R = 6371; // Radius of the earth in km
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
 
 function hideMinimap() {
   const minimapCard = document.querySelector('.minimap-card');
@@ -840,7 +801,7 @@ function fitMapToJourney(map, route, journey, displayDestination) {
   }
 }
 
-async function renderRoadJourneyMap(result) {
+async function renderRoadJourneyMapLegacy(result) {
   const container = document.getElementById('leaflet-map-container');
   const minimapCard = document.querySelector('.minimap-card');
   if (!container || !minimapCard) return;
@@ -959,7 +920,7 @@ async function renderRoadJourneyMap(result) {
   }, 250);
 }
 
-async function render3DMinimap(result) {
+async function render3DMinimapLegacy(result) {
   const container = document.getElementById('leaflet-map-container');
   const minimapCard = document.querySelector('.minimap-card');
   if (!container || !minimapCard) return;
@@ -1207,7 +1168,244 @@ async function render3DMinimap(result) {
   }, 250);
 }
 
-// Add automatic window resize map listener
+function setActiveTimelineItem(index) {
+  const items = timeline.querySelectorAll('[data-timeline-event]');
+  items.forEach((item) => {
+    item.classList.toggle('active-event', Number(item.dataset.timelineIndex) === Number(index));
+  });
+}
+
+function createEmojiMarkerIcon({ emoji, className }) {
+  return L.divIcon({
+    html: `<span class="map-emoji-marker ${className}">${emoji}</span>`,
+    className: 'map-emoji-marker-wrap',
+    iconSize: [42, 42],
+    iconAnchor: [21, 21],
+    popupAnchor: [0, -18],
+  });
+}
+
+function createCheckpointIcon(status = 'upcoming') {
+  return L.divIcon({
+    html: `<span class="map-checkpoint-dot map-checkpoint-dot--${status}"></span>`,
+    className: 'map-checkpoint-dot-wrap',
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
+  });
+}
+
+function getSegmentStyle(status) {
+  if (status === 'completed') {
+    return { color: '#8da7d1', weight: 4, opacity: 0.32 };
+  }
+  if (status === 'active') {
+    return { color: '#3b82f6', weight: 6, opacity: 0.92 };
+  }
+  return { color: '#d5deed', weight: 4, opacity: 0.6 };
+}
+
+function focusTimelineCheckpoint(index) {
+  if (!leafletMap) return;
+  setActiveTimelineItem(index);
+
+  for (const item of segmentPolylines) {
+    item.polyline.setStyle(item.baseStyle);
+  }
+
+  const relatedSegments = segmentPolylines.filter((item) =>
+    item.segment.fromTimelineIndex === index || item.segment.toTimelineIndex === index,
+  );
+
+  if (relatedSegments.length) {
+    const focusPoints = [];
+    for (const item of relatedSegments) {
+      item.polyline.setStyle({
+        ...item.baseStyle,
+        weight: item.baseStyle.weight + 1.5,
+        opacity: Math.min(1, item.baseStyle.opacity + 0.2),
+      });
+      focusPoints.push(...item.polyline.getLatLngs());
+    }
+
+    if (focusPoints.length > 1) {
+      leafletMap.fitBounds(L.latLngBounds(focusPoints), {
+        padding: [36, 36],
+        maxZoom: 15,
+      });
+    }
+  }
+
+  const checkpointEntry = checkpointMarkers.find((entry) => entry.timelineIndex === index);
+  if (checkpointEntry) {
+    leafletMap.panTo(checkpointEntry.marker.getLatLng(), { animate: true, duration: 0.35 });
+    checkpointEntry.marker.openPopup();
+  }
+}
+
+function bindTimelineMapFocus() {
+  const items = timeline.querySelectorAll('[data-timeline-event]');
+  items.forEach((item) => {
+    item.addEventListener('click', () => {
+      focusTimelineCheckpoint(Number(item.dataset.timelineIndex));
+    });
+  });
+}
+
+async function renderSegmentedJourney(journey) {
+  const segmentRoutes = await Promise.all(
+    (journey.segments || []).map(async (segment) => {
+      const routePoints = await fetchRoadRoute(fetch, segment.from, segment.to);
+      return {
+        segment,
+        points: snapRouteEndpoints(routePoints, segment.from, segment.to),
+      };
+    }),
+  );
+
+  segmentPolylines = segmentRoutes.map(({ segment, points }) => {
+    const baseStyle = getSegmentStyle(segment.status);
+    const polyline = L.polyline(points, {
+      ...baseStyle,
+      lineJoin: 'round',
+      lineCap: 'round',
+    }).addTo(leafletMap);
+
+    return { segment, polyline, baseStyle };
+  });
+
+  checkpointMarkers = (journey.checkpoints || []).map((checkpoint, visualIndex) => {
+    const markerStatus =
+      checkpoint.timelineIndex < (journey.currentCheckpoint?.timelineIndex ?? Infinity)
+        ? 'completed'
+        : checkpoint.timelineIndex === journey.currentCheckpoint?.timelineIndex
+          ? 'active'
+          : 'upcoming';
+
+    const marker = L.marker([checkpoint.lat, checkpoint.lng], {
+      icon: createCheckpointIcon(markerStatus),
+      zIndexOffset: 300 + visualIndex,
+    }).addTo(leafletMap);
+
+    const popupText = [checkpoint.time, checkpoint.detail].filter(Boolean).join(' · ') || 'Cap nhat vi tri';
+    marker.bindPopup(`<b>${checkpoint.title}</b><br>${popupText}`);
+    marker.on('click', () => focusTimelineCheckpoint(checkpoint.timelineIndex));
+
+    return { timelineIndex: checkpoint.timelineIndex, marker };
+  });
+}
+
+function fitSegmentedJourney(map, journey) {
+  if (!map || !journey) return;
+
+  try {
+    const points = [];
+    if (journey.origin) points.push([journey.origin.lat, journey.origin.lng]);
+    for (const point of journey.pathPoints || []) {
+      points.push([point.lat, point.lng]);
+    }
+    if (journey.destination) points.push([journey.destination.lat, journey.destination.lng]);
+
+    if (points.length === 1) {
+      map.setView(points[0], 14);
+      return;
+    }
+
+    map.fitBounds(points, {
+      padding: [40, 40],
+      maxZoom: 14,
+    });
+  } catch (error) {
+    console.warn('Error fitting bounds, fallback to Vietnam center:', error);
+    map.setView([16.047079, 108.206230], 6);
+  }
+}
+
+async function renderRoadJourneyMap(result) {
+  const container = document.getElementById('leaflet-map-container');
+  const minimapCard = document.querySelector('.minimap-card');
+  if (!container || !minimapCard) return;
+
+  if (!result || !result.ok || result.type !== 'live' || !result.events?.length) {
+    renderIdleMinimap();
+    return;
+  }
+
+  minimapCard.style.display = 'flex';
+
+  if (typeof L === 'undefined') {
+    container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--muted); font-size: 13px; font-weight: 500;">Dang tai thu vien ban do... Vui long thu lai sau giay lat.</div>';
+    return;
+  }
+
+  hideMinimap();
+  container.innerHTML = '<div id="minimap-coordinates-info" style="position: absolute; bottom: 10px; left: 10px; z-index: 1000; padding: 6px 12px; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(4px); border-radius: 8px; font-size: 11px; border: 1px solid var(--line); font-weight: 500; pointer-events: none; color: var(--ink);">Cuon de thu phong · Keo de di chuyen</div>';
+
+  const journey = buildMapJourney(
+    result,
+    { lat: 21.0285, lng: 105.8542 },
+    { lat: 10.8231, lng: 106.6297 },
+  );
+
+  if (!journey.current || !journey.destination) {
+    renderIdleMinimap();
+    return;
+  }
+
+  leafletMap = L.map(container, {
+    zoomControl: false,
+    attributionControl: false,
+  });
+
+  leafletMap.setView([16.047079, 108.206230], 6);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+  }).addTo(leafletMap);
+
+  L.control.zoom({
+    position: 'bottomright',
+  }).addTo(leafletMap);
+
+  const truckIcon = createEmojiMarkerIcon({ emoji: '🚚', className: 'map-emoji-marker--truck' });
+  const recipientIcon = createEmojiMarkerIcon({ emoji: '🤵‍♂️', className: 'map-emoji-marker--recipient' });
+
+  if (journey.origin) {
+    originMarker = L.marker([journey.origin.lat, journey.origin.lng], {
+      icon: createCheckpointIcon('completed'),
+      zIndexOffset: 120,
+    }).addTo(leafletMap);
+    originMarker.bindPopup('<b>Diem lay hang</b>');
+  }
+
+  destinationMarker = L.marker([journey.destination.lat, journey.destination.lng], {
+    icon: recipientIcon,
+    zIndexOffset: 500,
+  }).addTo(leafletMap);
+  destinationMarker.bindPopup('<b>Vi tri nguoi nhan</b>');
+
+  truckMarker = L.marker([journey.current.lat, journey.current.lng], {
+    icon: truckIcon,
+    zIndexOffset: 1000,
+  }).addTo(leafletMap);
+  truckMarker.bindPopup('<b>Vi tri xe hien tai</b>');
+
+  await renderSegmentedJourney(journey);
+  fitSegmentedJourney(leafletMap, journey);
+  bindTimelineMapFocus();
+
+  if (journey.currentCheckpoint) {
+    setActiveTimelineItem(journey.currentCheckpoint.timelineIndex);
+  }
+
+  setTimeout(() => {
+    if (leafletMap) {
+      try {
+        leafletMap.invalidateSize();
+      } catch (error) {}
+    }
+  }, 250);
+}
+
 window.addEventListener('resize', () => {
   if (leafletMap) {
     try {

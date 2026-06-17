@@ -1021,6 +1021,51 @@ h1 {
   background-color: rgba(238, 217, 209, 0.75);
 }
 
+.map-emoji-marker-wrap,
+.map-checkpoint-dot-wrap {
+  background: transparent;
+  border: 0;
+}
+
+.map-emoji-marker {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.96);
+  box-shadow: 0 12px 22px rgba(45, 34, 30, 0.18);
+  font-size: 22px;
+  line-height: 1;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.map-emoji-marker--truck {
+  background: linear-gradient(180deg, #2d2d2d 0%, #111 100%);
+}
+
+.map-emoji-marker--recipient {
+  background: linear-gradient(180deg, #ffe8ec 0%, #ffd5dc 100%);
+}
+
+.map-checkpoint-dot {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.94);
+  box-shadow: 0 6px 12px rgba(82, 51, 42, 0.14);
+  background: #d5deed;
+}
+
+.map-checkpoint-dot--completed {
+  background: #9db3d7;
+}
+
+.map-checkpoint-dot--active {
+  background: #3b82f6;
+}
+
 /* Custom Leaflet Marker Animations */
 .map-model {
   position: relative;
