@@ -59,7 +59,7 @@ function createCard(product) {
   `;
 }
 
-function skeletonMarkup(count = 4) {
+function skeletonMarkup(count = 5) {
   return Array.from({ length: count }, () => `
     <article class="featured-products__card featured-products__card--skeleton" aria-hidden="true">
       <div class="featured-products__media"><div class="featured-products__skeleton featured-products__skeleton--image"></div></div>
@@ -141,11 +141,11 @@ export async function mountFeaturedProducts() {
   const grid = root.querySelector('[data-featured-products-grid]');
   if (!grid) return;
 
-  grid.innerHTML = skeletonMarkup(4);
+  grid.innerHTML = skeletonMarkup(5);
 
   try {
     const payload = await fetchFeaturedProducts();
-    const products = Array.isArray(payload?.products) ? payload.products.slice(0, 4) : [];
+    const products = Array.isArray(payload?.products) ? payload.products.slice(0, 5) : [];
 
     if (!payload?.ok || products.length === 0) {
       throw new Error(payload?.message || 'Khong the tai san pham');
