@@ -42,7 +42,11 @@ async function fetchLatestGhnOrders() {
   const baseUrl = process.env.GHN_BASE_URL || DEFAULT_GHN_BASE_URL;
 
   if (!token || !shopId) {
-    throw new Error('Missing GHN_TOKEN or GHN_SHOP_ID.');
+    return {
+      orders: [],
+      skipped: true,
+      reason: 'missing_ghn_credentials',
+    };
   }
 
   const searchUrl = `${baseUrl.replace(/\/public-api$/, '')}/public-api/v2/shipping-order/search`;
@@ -63,7 +67,11 @@ async function fetchLatestGhnOrders() {
     throw new Error(data?.message || `GHN search API returned HTTP ${response.status}.`);
   }
 
-  return data?.data?.data || [];
+  return {
+    orders: data?.data?.data || [],
+    skipped: false,
+    reason: null,
+  };
 }
 
 function hasMeaningfulChanges(currentOrders, latestOrders) {
@@ -116,10 +124,14 @@ export async function runScheduledSync({
   readLatestOrders = fetchLatestGhnOrders,
   triggerRebuild = triggerBuildHook,
 } = {}) {
-  const [currentOrders, latestOrders] = await Promise.all([
+  const [currentOrders, latestResult] = await Promise.all([
     readCurrentOrders(),
     readLatestOrders(),
   ]);
+
+  const latestOrders = Array.isArray(latestResult) ? latestResult : latestResult.orders || [];
+  const syncSkipped = !Array.isArray(latestResult) && Boolean(latestResult?.skipped);
+  const syncSkipReason = !Array.isArray(latestResult) ? (latestResult?.reason ?? null) : null;
 
   const rebuildNeeded = hasMeaningfulChanges(currentOrders, latestOrders);
   const buildHook = rebuildNeeded
@@ -130,6 +142,8 @@ export async function runScheduledSync({
     checkedAt: new Date().toISOString(),
     latestCount: latestOrders.length,
     currentCount: currentOrders.length,
+    syncSkipped,
+    syncSkipReason,
     rebuildNeeded,
     rebuildTriggered: buildHook.triggered,
     buildHookSkipped: buildHook.skipped,

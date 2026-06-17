@@ -33,7 +33,7 @@ test('triggerBuildHook skips cleanly when NETLIFY_BUILD_HOOK_URL is missing', as
 test('runScheduledSync returns success metadata when rebuild is needed but build hook is skipped', async () => {
   const result = await runScheduledSync({
     readCurrentOrders: async () => [{ order_code: 'A001', status: 'ready_to_pick', updated_date: '2026-06-17T01:00:00.000Z' }],
-    readLatestOrders: async () => [{ order_code: 'A001', status: 'delivering', updated_date: '2026-06-17T02:00:00.000Z' }],
+    readLatestOrders: async () => ({ orders: [{ order_code: 'A001', status: 'delivering', updated_date: '2026-06-17T02:00:00.000Z' }], skipped: false, reason: null }),
     triggerRebuild: async () => ({
       triggered: false,
       skipped: true,
@@ -47,6 +47,8 @@ test('runScheduledSync returns success metadata when rebuild is needed but build
   assert.equal(result.buildHookReason, 'missing_build_hook_url');
   assert.equal(result.currentCount, 1);
   assert.equal(result.latestCount, 1);
+  assert.equal(result.syncSkipped, false);
+  assert.equal(result.syncSkipReason, null);
 });
 
 test('runScheduledSync does not trigger a build hook when nothing meaningful changed', async () => {
@@ -54,7 +56,7 @@ test('runScheduledSync does not trigger a build hook when nothing meaningful cha
 
   const result = await runScheduledSync({
     readCurrentOrders: async () => [{ order_code: 'A001', status: 'ready_to_pick', updated_date: '2026-06-17T01:00:00.000Z' }],
-    readLatestOrders: async () => [{ order_code: 'A001', status: 'ready_to_pick', updated_date: '2026-06-17T01:00:00.000Z' }],
+    readLatestOrders: async () => ({ orders: [{ order_code: 'A001', status: 'ready_to_pick', updated_date: '2026-06-17T01:00:00.000Z' }], skipped: false, reason: null }),
     triggerRebuild: async () => {
       triggerCalled = true;
       return { triggered: true, skipped: false, reason: null };
@@ -65,5 +67,28 @@ test('runScheduledSync does not trigger a build hook when nothing meaningful cha
   assert.equal(result.rebuildTriggered, false);
   assert.equal(result.buildHookSkipped, false);
   assert.equal(result.buildHookReason, null);
+  assert.equal(triggerCalled, false);
+});
+
+test('runScheduledSync skips cleanly when GHN credentials are missing', async () => {
+  let triggerCalled = false;
+
+  const result = await runScheduledSync({
+    readCurrentOrders: async () => [{ order_code: 'A001', status: 'ready_to_pick', updated_date: '2026-06-17T01:00:00.000Z' }],
+    readLatestOrders: async () => ({
+      orders: [],
+      skipped: true,
+      reason: 'missing_ghn_credentials',
+    }),
+    triggerRebuild: async () => {
+      triggerCalled = true;
+      return { triggered: true, skipped: false, reason: null };
+    },
+  });
+
+  assert.equal(result.syncSkipped, true);
+  assert.equal(result.syncSkipReason, 'missing_ghn_credentials');
+  assert.equal(result.rebuildNeeded, false);
+  assert.equal(result.rebuildTriggered, false);
   assert.equal(triggerCalled, false);
 });
