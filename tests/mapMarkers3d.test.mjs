@@ -46,6 +46,12 @@ test('map zoom is driven by the truck and recipient display points instead of ol
   assert.match(appSource, /fitMarkerViewport\(leafletMap,\s*markerDisplayState\)/);
 });
 
+test('marker display state keeps start and end icons on the exact route coordinates', () => {
+  assert.doesNotMatch(appSource, /VISUAL_OFFSET/);
+  assert.match(appSource, /destinationMarker = L\.marker\(\[markerDisplayState\.recipientDisplayPoint\.lat,\s*markerDisplayState\.recipientDisplayPoint\.lng\]/);
+  assert.match(appSource, /truckMarker = markerDisplayState\.truckDisplayPoint/);
+});
+
 test('phone order detail buttons reuse the last captcha proof instead of reopening captcha', () => {
   assert.match(appSource, /let lastCaptchaProof = null;/);
   assert.match(appSource, /trackCurrentCode\(code,\s*\{\s*reuseLastCaptcha:\s*true\s*\}\)/);

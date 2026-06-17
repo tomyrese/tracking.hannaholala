@@ -6,14 +6,15 @@ import {
   buildViewportFocusPoints,
 } from '../src/mapViewport.mjs';
 
-test('keeps truck and recipient markers visible by separating them when the points nearly overlap', () => {
+test('keeps truck and recipient markers pinned to their real coordinates even when the points nearly overlap', () => {
   const state = buildMarkerDisplayState(
     { lat: 21.603418, lng: 103.43056 },
     { lat: 21.60345, lng: 103.43048 },
   );
 
-  assert.notDeepEqual(state.truckDisplayPoint, state.recipientDisplayPoint);
-  assert.equal(state.hasVisualSeparation, true);
+  assert.deepEqual(state.truckDisplayPoint, { lat: 21.603418, lng: 103.43056 });
+  assert.deepEqual(state.recipientDisplayPoint, { lat: 21.60345, lng: 103.43048 });
+  assert.equal(state.hasVisualSeparation, false);
 });
 
 test('keeps the real positions untouched when truck and recipient are already far apart', () => {

@@ -1,14 +1,3 @@
-const VISUAL_OVERLAP_THRESHOLD = 0.0012;
-const VISUAL_OFFSET = {
-  lat: 0.00042,
-  lng: 0.00058,
-};
-
-function pointsAreNear(a, b, threshold = VISUAL_OVERLAP_THRESHOLD) {
-  if (!a || !b) return false;
-  return Math.abs(a.lat - b.lat) <= threshold && Math.abs(a.lng - b.lng) <= threshold;
-}
-
 export function buildMarkerDisplayState(truckPoint, recipientPoint) {
   const options = arguments[2] || {};
   const { delivered = false } = options;
@@ -29,24 +18,10 @@ export function buildMarkerDisplayState(truckPoint, recipientPoint) {
     };
   }
 
-  if (!pointsAreNear(truckPoint, recipientPoint)) {
-    return {
-      truckDisplayPoint: { ...truckPoint },
-      recipientDisplayPoint: { ...recipientPoint },
-      hasVisualSeparation: false,
-    };
-  }
-
   return {
-    truckDisplayPoint: {
-      lat: truckPoint.lat - VISUAL_OFFSET.lat,
-      lng: truckPoint.lng - VISUAL_OFFSET.lng,
-    },
-    recipientDisplayPoint: {
-      lat: recipientPoint.lat + VISUAL_OFFSET.lat,
-      lng: recipientPoint.lng + VISUAL_OFFSET.lng,
-    },
-    hasVisualSeparation: true,
+    truckDisplayPoint: { ...truckPoint },
+    recipientDisplayPoint: { ...recipientPoint },
+    hasVisualSeparation: false,
   };
 }
 
