@@ -64,6 +64,7 @@ test('destination marker stays on the recipient icon while truck focus only repo
 test('styles distinguish interactive and static timeline checkpoints', () => {
   assert.match(styles, /\.timeline__item\[data-map-interactive="true"\]::after/);
   assert.match(styles, /\.timeline__item--static\b/);
+  assert.match(styles, /grid-column:\s*2/);
 });
 
 test('route shape signatures support tuple coordinates returned by fetchRoadRoute', () => {

@@ -70,9 +70,9 @@ test('falls back to a direct line when OSRM returns geometry outside Vietnam', a
               geometry: {
                 coordinates: [
                   [106.5, 10.5],
-                  [105.0, 11.3],
-                  [104.9, 11.4],
-                  [105.1, 11.5],
+                  [110.1, 19.8],
+                  [110.3, 20.1],
+                  [110.2, 20.4],
                   [106.8, 10.8],
                 ],
               },

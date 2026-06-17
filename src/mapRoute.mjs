@@ -3,54 +3,20 @@ export function buildOsrmRouteUrl(points) {
   return `https://router.project-osrm.org/route/v1/driving/${encodedPoints}?overview=full&geometries=geojson`;
 }
 
-const VIETNAM_POLYGON = [
-  { lng: 102.1, lat: 23.4 },
-  { lng: 103.4, lat: 22.7 },
-  { lng: 104.9, lat: 22.5 },
-  { lng: 106.2, lat: 23.3 },
-  { lng: 107.5, lat: 23.4 },
-  { lng: 108.7, lat: 21.9 },
-  { lng: 109.4, lat: 18.5 },
-  { lng: 109.3, lat: 15.0 },
-  { lng: 109.1, lat: 12.0 },
-  { lng: 108.6, lat: 10.2 },
-  { lng: 107.8, lat: 8.6 },
-  { lng: 106.4, lat: 8.5 },
-  { lng: 105.5, lat: 9.3 },
-  { lng: 105.6, lat: 10.8 },
-  { lng: 106.0, lat: 12.2 },
-  { lng: 106.0, lat: 13.7 },
-  { lng: 105.6, lat: 15.2 },
-  { lng: 105.2, lat: 16.7 },
-  { lng: 104.7, lat: 18.5 },
-  { lng: 104.3, lat: 20.0 },
-  { lng: 103.6, lat: 21.3 },
-  { lng: 102.7, lat: 22.5 },
-];
-
-function isPointInPolygon(lat, lng, polygon) {
-  let inside = false;
-
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i, i += 1) {
-    const xi = polygon[i].lng;
-    const yi = polygon[i].lat;
-    const xj = polygon[j].lng;
-    const yj = polygon[j].lat;
-
-    const intersects =
-      yi > lat !== yj > lat &&
-      lng < ((xj - xi) * (lat - yi)) / ((yj - yi) || Number.EPSILON) + xi;
-
-    if (intersects) {
-      inside = !inside;
-    }
-  }
-
-  return inside;
-}
+const VIETNAM_BOUNDS = {
+  minLat: 8.1,
+  maxLat: 23.9,
+  minLng: 102.0,
+  maxLng: 109.7,
+};
 
 function isPointInVietnam(lat, lng) {
-  return isPointInPolygon(lat, lng, VIETNAM_POLYGON);
+  return (
+    lat >= VIETNAM_BOUNDS.minLat &&
+    lat <= VIETNAM_BOUNDS.maxLat &&
+    lng >= VIETNAM_BOUNDS.minLng &&
+    lng <= VIETNAM_BOUNDS.maxLng
+  );
 }
 
 function routeLeavesVietnamMeaningfully(points) {
