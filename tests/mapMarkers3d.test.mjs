@@ -6,7 +6,7 @@ const appSource = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8'
 const styles = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
 
 test('map render uses emoji markers and removes browser geolocation dependency', () => {
-  assert.match(appSource, /emoji:\s*'🚚'/);
+  assert.match(appSource, /emoji:\s*'🚚📦'/);
   assert.match(appSource, /emoji:\s*'🤵‍♂️'/);
   assert.match(appSource, /createEmojiMarkerIcon/);
   assert.match(appSource, /renderSegmentedJourney/);
@@ -75,12 +75,13 @@ test('destination marker stays on the recipient icon while truck focus only repo
   assert.doesNotMatch(appSource, /truckMarker\.setIcon\(recipientIcon\)/);
 });
 
-test('delivered map state swaps to a recipient-plus-package marker and removes the truck marker', () => {
+test('delivered map state swaps icons to truck-only and recipient-plus-package', () => {
   assert.match(appSource, /function createDeliveredRecipientIcon\(\)/);
   assert.match(appSource, /<span class="map-emoji-marker__duo"><span>🤵‍♂️<\/span><span>📦<\/span><\/span>/);
+  assert.match(appSource, /const deliveredTruckIcon = createEmojiMarkerIcon\(\{ emoji: '🚚'/);
   assert.match(appSource, /const isDeliveredJourney = isDeliveredResult\(result,\s*journey\)/);
   assert.match(appSource, /icon:\s*isDeliveredJourney\s*\?\s*deliveredRecipientIcon\s*:\s*recipientIcon/);
-  assert.match(appSource, /truckMarker = markerDisplayState\.truckDisplayPoint\s*\?/);
+  assert.match(appSource, /icon:\s*isDeliveredJourney\s*\?\s*deliveredTruckIcon\s*:\s*truckIcon/);
 });
 
 test('styles distinguish interactive and static timeline checkpoints', () => {
@@ -90,14 +91,12 @@ test('styles distinguish interactive and static timeline checkpoints', () => {
   assert.match(styles, /Bấm để xem trên bản đồ/);
 });
 
-test('delivered timeline entry uses a dedicated summary layout while order creation stays non-interactive', () => {
+test('timeline only keeps interactive map events and deduplicates delivered updates', () => {
   assert.match(appSource, /function isOrderInitEvent\(title\)/);
-  assert.match(appSource, /const isDeliveredSummary = isDeliveredTimelineEvent\(event\) && index === 0/);
-  assert.match(appSource, /timeline__item--summary timeline__item--delivered/);
   assert.match(appSource, /function prepareVisibleTimelineEvents\(result\)/);
   assert.match(appSource, /filter\(\(event\) => readTimelinePoint\(event\) && !isOrderInitEvent\(event\.title\)\)/);
-  assert.match(styles, /\.timeline__item--summary\b/);
-  assert.match(styles, /\.timeline__item--delivered\b/);
+  assert.match(appSource, /const key = isDeliveredTimelineEvent\(event\)\s*\?\s*'delivered'\s*:/);
+  assert.doesNotMatch(appSource, /timeline__item--summary timeline__item--delivered/);
 });
 
 test('route shape signatures support tuple coordinates returned by fetchRoadRoute', () => {

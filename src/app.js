@@ -106,6 +106,7 @@ function readRecipientPoint(result) {
 
 function prepareVisibleTimelineEvents(result) {
   const recipientPoint = readRecipientPoint(result);
+  const seenKeys = new Set();
 
   return (result?.events || [])
     .map((event) => {
@@ -119,7 +120,17 @@ function prepareVisibleTimelineEvents(result) {
 
       return event;
     })
-    .filter((event) => readTimelinePoint(event) && !isOrderInitEvent(event.title));
+    .filter((event) => readTimelinePoint(event) && !isOrderInitEvent(event.title))
+    .filter((event) => {
+      const point = readTimelinePoint(event);
+      const key = isDeliveredTimelineEvent(event)
+        ? 'delivered'
+        : `${normalizeStatusText(event.title)}|${point.lat}|${point.lng}`;
+
+      if (seenKeys.has(key)) return false;
+      seenKeys.add(key);
+      return true;
+    });
 }
 
 function timelineItem(event, index = 0) {
@@ -129,31 +140,12 @@ function timelineItem(event, index = 0) {
   const lngAttr = event.lng ? ` data-lng="${event.lng}"` : '';
   const titleAttr = ` data-title="${event.title || ''}"`;
   const indexAttr = ` data-timeline-index="${index}"`;
-  const isDeliveredSummary = isDeliveredTimelineEvent(event) && index === 0;
-  const isMapInteractive = Boolean(event.lat && event.lng) && !isOrderInitEvent(event.title) && !isDeliveredSummary;
+  const isMapInteractive = Boolean(event.lat && event.lng) && !isOrderInitEvent(event.title);
   const interactiveAttr = isMapInteractive ? ' data-map-interactive="true"' : '';
   const itemClassName = [
     'timeline__item',
     !isMapInteractive ? 'timeline__item--static' : '',
-    isDeliveredSummary ? 'timeline__item--summary timeline__item--delivered' : '',
   ].filter(Boolean).join(' ');
-
-  if (isDeliveredSummary) {
-    return `
-      <li class="${itemClassName}" data-timeline-event${indexAttr}${latAttr}${lngAttr}${titleAttr}${interactiveAttr}>
-        <span class="timeline__icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24">${icons[iconName]}</svg>
-        </span>
-        <div class="timeline__summary-body">
-          <div class="timeline__summary-top">
-            <strong>${event.title || 'Cập nhật hành trình'}</strong>
-            ${event.time ? `<span class="timeline__summary-time">${event.time}</span>` : ''}
-          </div>
-          <div class="timeline__detail">${event.detail || 'Đơn hàng đã được giao thành công.'}</div>
-        </div>
-      </li>
-    `;
-  }
 
   return `
     <li class="${itemClassName}" data-timeline-event${indexAttr}${latAttr}${lngAttr}${titleAttr}${interactiveAttr} style="padding: 6px 8px; border-radius: 12px; transition: background-color 0.2s;">
@@ -346,8 +338,8 @@ async function renderApiResult(result) {
   activeResultCode = cleanLookupCode(preparedResult.clientOrderCode || preparedResult.code);
 
   statusIcon.dataset.state = isLive ? 'success' : 'warning';
-  statusTitle.textContent = isLive ? preparedResult.status || 'Đã nhận dữ liệu hành trình' : preparedResult.status || 'Chưa lấy được dữ liệu';
-  statusCode.textContent = `Mã: ${preparedResult.code}`;
+  statusTitle.textContent = isLive ? `Mã đơn ${preparedResult.clientOrderCode || preparedResult.code}` : preparedResult.status || 'Chưa lấy được dữ liệu';
+  statusCode.textContent = isLive ? '' : `Mã: ${preparedResult.code}`;
   
   if (!preparedResult.ok && preparedResult.events) {
     preparedResult.events.forEach(evt => {
@@ -1550,7 +1542,8 @@ async function renderRoadJourneyMap(result) {
     position: 'bottomright',
   }).addTo(leafletMap);
 
-  const truckIcon = createEmojiMarkerIcon({ emoji: '🚚', className: 'map-emoji-marker--truck' });
+  const truckIcon = createEmojiMarkerIcon({ emoji: '🚚📦', className: 'map-emoji-marker--truck' });
+  const deliveredTruckIcon = createEmojiMarkerIcon({ emoji: '🚚', className: 'map-emoji-marker--truck' });
   const recipientIcon = createEmojiMarkerIcon({ emoji: '🤵‍♂️', className: 'map-emoji-marker--recipient' });
   const deliveredRecipientIcon = createDeliveredRecipientIcon();
   const isDeliveredJourney = isDeliveredResult(result, journey);
@@ -1565,7 +1558,7 @@ async function renderRoadJourneyMap(result) {
 
   truckMarker = markerDisplayState.truckDisplayPoint
     ? L.marker([markerDisplayState.truckDisplayPoint.lat, markerDisplayState.truckDisplayPoint.lng], {
-        icon: truckIcon,
+        icon: isDeliveredJourney ? deliveredTruckIcon : truckIcon,
         zIndexOffset: 1000,
       }).addTo(leafletMap)
     : null;

@@ -4,7 +4,7 @@ export function buildMarkerDisplayState(truckPoint, recipientPoint) {
 
   if (!truckPoint || !recipientPoint) {
     return {
-      truckDisplayPoint: delivered ? null : truckPoint || null,
+      truckDisplayPoint: truckPoint || null,
       recipientDisplayPoint: recipientPoint || null,
       hasVisualSeparation: false,
     };
@@ -12,7 +12,7 @@ export function buildMarkerDisplayState(truckPoint, recipientPoint) {
 
   if (delivered) {
     return {
-      truckDisplayPoint: null,
+      truckDisplayPoint: { ...truckPoint },
       recipientDisplayPoint: { ...recipientPoint },
       hasVisualSeparation: false,
     };
