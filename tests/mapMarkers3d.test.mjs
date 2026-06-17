@@ -37,3 +37,19 @@ test('focusTimelineCheckpoint moves the truck marker to the selected real checkp
   assert.match(appSource, /truckMarker\.setLatLng\(\[/);
   assert.match(appSource, /checkpointEntry\.marker\.getLatLng\(\)/);
 });
+
+test('phone order detail buttons reuse the last captcha proof instead of reopening captcha', () => {
+  assert.match(appSource, /let lastCaptchaProof = null;/);
+  assert.match(appSource, /trackCurrentCode\(code,\s*\{\s*reuseLastCaptcha:\s*true\s*\}\)/);
+  assert.match(appSource, /const shouldReuseCaptcha = Boolean\(options\.reuseLastCaptcha && lastCaptchaProof\);/);
+});
+
+test('timeline map focus only binds interactive behavior for events with real coordinates', () => {
+  assert.match(appSource, /const isMapInteractive = Boolean\(event\.lat && event\.lng\);/);
+  assert.match(appSource, /const items = timeline\.querySelectorAll\('\[data-timeline-event\]\[data-lat\]\[data-lng\]'\)/);
+});
+
+test('featured products use a centered five-column desktop grid', () => {
+  assert.match(styles, /grid-template-columns:\s*repeat\(5,\s*184px\);/);
+  assert.match(styles, /justify-content:\s*center;/);
+});

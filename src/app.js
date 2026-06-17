@@ -26,6 +26,7 @@ const backBtnContainer = document.querySelector('[data-back-btn-container]');
 
 let lastPhoneSearchResult = null;
 let activeResultCode = '';
+let lastCaptchaProof = null;
 const CLIENT_CAPTCHA_SALT = 'ho-tracking-client-captcha-v1';
 
 function mountBrandMarquee() {
@@ -80,9 +81,11 @@ function timelineItem(event, index = 0) {
   const lngAttr = event.lng ? ` data-lng="${event.lng}"` : '';
   const titleAttr = ` data-title="${event.title || ''}"`;
   const indexAttr = ` data-timeline-index="${index}"`;
+  const isMapInteractive = Boolean(event.lat && event.lng);
+  const interactiveAttr = isMapInteractive ? ' data-map-interactive="true"' : '';
 
   return `
-    <li class="timeline__item" data-timeline-event${indexAttr}${latAttr}${lngAttr}${titleAttr} style="cursor: pointer; padding: 6px 8px; border-radius: 12px; transition: background-color 0.2s;">
+    <li class="timeline__item${isMapInteractive ? '' : ' timeline__item--static'}" data-timeline-event${indexAttr}${latAttr}${lngAttr}${titleAttr}${interactiveAttr} style="padding: 6px 8px; border-radius: 12px; transition: background-color 0.2s;">
       <span class="timeline__icon" aria-hidden="true">
         <svg viewBox="0 0 24 24">${icons[iconName]}</svg>
       </span>
@@ -223,7 +226,7 @@ function renderPhoneOrders(orders) {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
       const code = btn.getAttribute('data-code');
-      trackCurrentCode(code);
+      trackCurrentCode(code, { reuseLastCaptcha: true });
     });
   });
 }
@@ -529,7 +532,7 @@ function askCaptcha() {
   });
 }
 
-async function trackCurrentCode(codeOverride = '') {
+async function trackCurrentCode(codeOverride = '', options = {}) {
   const hasOverride = cleanLookupCode(codeOverride).length > 0;
   if (!hasOverride) syncCleanInputValue();
 
@@ -563,8 +566,10 @@ async function trackCurrentCode(codeOverride = '') {
     }
   }
 
-  const captchaResult = await askCaptcha();
+  const shouldReuseCaptcha = Boolean(options.reuseLastCaptcha && lastCaptchaProof);
+  const captchaResult = shouldReuseCaptcha ? lastCaptchaProof : await askCaptcha();
   if (!captchaResult) return; // cancelled
+  lastCaptchaProof = captchaResult;
 
   trackButton.disabled = true;
   trackButton.setAttribute('aria-busy', 'true');
@@ -594,7 +599,8 @@ async function trackCurrentCode(codeOverride = '') {
       captchaInput.style.borderColor = 'var(--rose)';
 
       // Re-trigger captcha flow to reload image and let user retry
-      setTimeout(trackCurrentCode, 100);
+      lastCaptchaProof = null;
+      setTimeout(() => trackCurrentCode(finalCode), 100);
       return;
     }
 
@@ -1248,7 +1254,7 @@ function focusTimelineCheckpoint(index) {
 }
 
 function bindTimelineMapFocus() {
-  const items = timeline.querySelectorAll('[data-timeline-event]');
+  const items = timeline.querySelectorAll('[data-timeline-event][data-lat][data-lng]');
   items.forEach((item) => {
     item.addEventListener('click', () => {
       focusTimelineCheckpoint(Number(item.dataset.timelineIndex));

@@ -140,7 +140,8 @@ svg {
 
 .featured-products__grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(5, 184px);
+  justify-content: center;
   gap: 8px;
   padding: 0 0 12px;
 }
@@ -608,6 +609,10 @@ h1 {
   color: #6f554b;
 }
 
+.timeline__item--static {
+  cursor: default;
+}
+
 @media (min-width: 921px) {
   .tracking-card {
     display: flex;
@@ -786,7 +791,8 @@ h1 {
   }
 
   .featured-products__grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, 184px);
+    justify-content: center;
   }
 
 }
@@ -820,6 +826,10 @@ h1 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
     padding: 0 0 12px;
+  }
+
+  .featured-products__card {
+    width: 100%;
   }
 
   .brand-marquee {
@@ -1014,9 +1024,14 @@ h1 {
   stroke: none !important;
 }
 
-.timeline__item[data-timeline-event]:hover {
+.timeline__item[data-map-interactive="true"] {
+  cursor: pointer;
+}
+
+.timeline__item[data-map-interactive="true"]:hover {
   background-color: rgba(238, 217, 209, 0.4);
 }
+.timeline__item[data-map-interactive="true"].active-event,
 .timeline__item[data-timeline-event].active-event {
   background-color: rgba(238, 217, 209, 0.75);
 }
