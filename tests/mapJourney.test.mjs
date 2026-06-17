@@ -1,0 +1,91 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+
+import { buildMapJourney } from '../src/mapJourney.mjs';
+
+test('uses the newest event with coordinates as the current sender position', () => {
+  const result = {
+    from_location: { lat: 10.1, long: 106.1 },
+    to_location: { lat: 10.9, long: 106.9 },
+    events: [
+      { title: 'Dang giao', lat: 10.6, lng: 106.6 },
+      { title: 'Dang luan chuyen', lat: 10.4, lng: 106.4 },
+    ],
+  };
+
+  const journey = buildMapJourney(result, { lat: 0, lng: 0 }, { lat: 1, lng: 1 });
+
+  assert.deepEqual(journey.current, { lat: 10.6, lng: 106.6 });
+  assert.deepEqual(journey.origin, { lat: 10.1, lng: 106.1 });
+  assert.deepEqual(journey.destination, { lat: 10.9, lng: 106.9 });
+  assert.deepEqual(journey.routeStart, { lat: 10.6, lng: 106.6 });
+  assert.deepEqual(journey.routeEnd, { lat: 10.9, lng: 106.9 });
+  assert.equal(journey.currentTitle, 'Dang giao');
+  assert.equal(journey.isCollapsed, false);
+  assert.equal(journey.isNearDestination, false);
+});
+
+test('falls back to origin when no event coordinates are available', () => {
+  const result = {
+    from_location: { lat: 11.1, long: 107.1 },
+    to_location: { lat: 11.9, long: 107.9 },
+    events: [
+      { title: 'Khoi tao don hang', lat: null, lng: null },
+      { title: 'Dang xu ly' },
+    ],
+  };
+
+  const journey = buildMapJourney(result, { lat: 0, lng: 0 }, { lat: 1, lng: 1 });
+
+  assert.deepEqual(journey.current, { lat: 11.1, lng: 107.1 });
+  assert.deepEqual(journey.destination, { lat: 11.9, lng: 107.9 });
+  assert.deepEqual(journey.routeStart, { lat: 11.1, lng: 107.1 });
+  assert.deepEqual(journey.routeEnd, { lat: 11.9, lng: 107.9 });
+  assert.equal(journey.currentTitle, 'Vi tri gui hang (Hien tai)');
+  assert.equal(journey.isNearDestination, false);
+});
+
+test('marks the route as collapsed when current and destination are the same point', () => {
+  const result = {
+    from_location: { lat: 12.3, long: 108.3 },
+    to_location: { lat: 12.3, long: 108.3 },
+    events: [{ title: 'Giao thanh cong', lat: 12.3, lng: 108.3 }],
+  };
+
+  const journey = buildMapJourney(result, { lat: 0, lng: 0 }, { lat: 1, lng: 1 });
+
+  assert.equal(journey.isCollapsed, true);
+  assert.equal(journey.isNearDestination, true);
+});
+
+test('prefers the earliest reliable origin and latest live point for current', () => {
+  const result = {
+    from_location: { lat: '21.1', long: '105.8' },
+    to_location: { lat: '10.8', long: '106.6' },
+    events: [
+      { title: 'Dang giao', lat: 10.95, lng: 106.72 },
+      { title: 'Da lay hang', lat: 11.02, lng: 106.68 },
+      { title: 'Khoi tao don hang' },
+    ],
+  };
+
+  const journey = buildMapJourney(result, { lat: 0, lng: 0 }, { lat: 1, lng: 1 });
+
+  assert.deepEqual(journey.origin, { lat: 21.1, lng: 105.8 });
+  assert.deepEqual(journey.current, { lat: 10.95, lng: 106.72 });
+  assert.deepEqual(journey.destination, { lat: 10.8, lng: 106.6 });
+  assert.deepEqual(journey.routeStart, { lat: 10.95, lng: 106.72 });
+  assert.deepEqual(journey.routeEnd, { lat: 10.8, lng: 106.6 });
+});
+
+test('marks near-overlap when current and destination are within a tiny distance threshold', () => {
+  const result = {
+    events: [{ title: 'Dang giao', lat: 10.80004, lng: 106.60003 }],
+    to_location: { lat: 10.8, long: 106.6 },
+  };
+
+  const journey = buildMapJourney(result, { lat: 0, lng: 0 }, { lat: 1, lng: 1 });
+
+  assert.equal(journey.isCollapsed, false);
+  assert.equal(journey.isNearDestination, true);
+});

@@ -1,0 +1,11 @@
+/src/logo-optimized/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/styles.css
+  Cache-Control: public, max-age=0, must-revalidate
+
+/src/*.js
+  Cache-Control: public, max-age=0, must-revalidate
+
+/src/*.mjs
+  Cache-Control: public, max-age=0, must-revalidate

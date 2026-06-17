@@ -1,0 +1,27 @@
+[build]
+  command = "npm run build"
+  publish = "."
+  functions = "netlify/functions"
+
+[functions]
+  included_files = ["ghn_orders.json"]
+
+[[redirects]]
+  from = "/api/track"
+  to = "/.netlify/functions/track"
+  status = 200
+
+[[redirects]]
+  from = "/api/captcha/generate"
+  to = "/.netlify/functions/captcha"
+  status = 200
+
+[[redirects]]
+  from = "/api/health"
+  to = "/.netlify/functions/health"
+  status = 200
+
+[[redirects]]
+  from = "/api/bnb-products"
+  to = "/.netlify/functions/bnb-products"
+  status = 200
