@@ -33,6 +33,19 @@ function isSamePoint(a, b) {
   return !!a && !!b && a.lat === b.lat && a.lng === b.lng;
 }
 
+function dedupeCheckpoints(checkpoints) {
+  const unique = [];
+
+  for (const checkpoint of checkpoints) {
+    const last = unique[unique.length - 1];
+    if (!last || !isSamePoint(last, checkpoint)) {
+      unique.push(checkpoint);
+    }
+  }
+
+  return unique;
+}
+
 function pushUniquePoint(points, point) {
   if (!point) return;
   const last = points[points.length - 1];
@@ -43,23 +56,25 @@ function pushUniquePoint(points, point) {
 
 export function buildMapJourney(result, fallbackOrigin, fallbackDestination) {
   const events = result?.events || [];
-  const eventCheckpoints = events
-    .map((event, timelineIndex) => {
-      const point = readEventPoint(event);
-      if (!point) return null;
+  const eventCheckpoints = dedupeCheckpoints(
+    events
+      .map((event, timelineIndex) => {
+        const point = readEventPoint(event);
+        if (!point) return null;
 
-      return {
-        lat: point.lat,
-        lng: point.lng,
-        title: event.title || 'Cap nhat hanh trinh',
-        time: event.time || '',
-        detail: event.detail || '',
-        timelineIndex,
-        kind: 'event',
-        isCurrent: timelineIndex === 0,
-      };
-    })
-    .filter(Boolean);
+        return {
+          lat: point.lat,
+          lng: point.lng,
+          title: event.title || 'Cap nhat hanh trinh',
+          time: event.time || '',
+          detail: event.detail || '',
+          timelineIndex,
+          kind: 'event',
+          isCurrent: timelineIndex === 0,
+        };
+      })
+      .filter(Boolean),
+  );
 
   const origin =
     readLocationPoint(result?.from_location) ||
@@ -86,6 +101,10 @@ export function buildMapJourney(result, fallbackOrigin, fallbackDestination) {
   const segments = [];
 
   for (let index = 0; index < pathPoints.length - 1; index += 1) {
+    const from = pathPoints[index];
+    const to = pathPoints[index + 1];
+    if (isSamePoint(from, to)) continue;
+
     let status = 'upcoming';
     if (currentPathIndex === -1 || currentPathIndex === pathPoints.length - 1) {
       status = 'completed';
@@ -96,11 +115,11 @@ export function buildMapJourney(result, fallbackOrigin, fallbackDestination) {
     }
 
     segments.push({
-      index,
-      from: { lat: pathPoints[index].lat, lng: pathPoints[index].lng },
-      to: { lat: pathPoints[index + 1].lat, lng: pathPoints[index + 1].lng },
-      fromTimelineIndex: pathPoints[index].timelineIndex,
-      toTimelineIndex: pathPoints[index + 1].timelineIndex,
+      index: segments.length,
+      from: { lat: from.lat, lng: from.lng },
+      to: { lat: to.lat, lng: to.lng },
+      fromTimelineIndex: from.timelineIndex,
+      toTimelineIndex: to.timelineIndex,
       status,
     });
   }

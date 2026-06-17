@@ -1201,6 +1201,12 @@ function createCheckpointIcon(status = 'upcoming') {
   });
 }
 
+function pointsSignature(points) {
+  return points
+    .map((point) => `${point.lat.toFixed(5)},${point.lng.toFixed(5)}`)
+    .join('|');
+}
+
 function getSegmentStyle(status) {
   if (status === 'completed') {
     return { color: '#7fc2ff', weight: 4.5, opacity: 0.82 };
@@ -1273,16 +1279,25 @@ async function renderSegmentedJourney(journey) {
     }),
   );
 
-  segmentPolylines = segmentRoutes.map(({ segment, points }) => {
-    const baseStyle = getSegmentStyle(segment.status);
-    const polyline = L.polyline(points, {
-      ...baseStyle,
-      lineJoin: 'round',
-      lineCap: 'round',
-    }).addTo(leafletMap);
+  const seenRouteShapes = new Set();
 
-    return { segment, polyline, baseStyle };
-  });
+  segmentPolylines = segmentRoutes
+    .filter(({ points }) => {
+      const signature = pointsSignature(points);
+      if (seenRouteShapes.has(signature)) return false;
+      seenRouteShapes.add(signature);
+      return true;
+    })
+    .map(({ segment, points }) => {
+      const baseStyle = getSegmentStyle(segment.status);
+      const polyline = L.polyline(points, {
+        ...baseStyle,
+        lineJoin: 'round',
+        lineCap: 'round',
+      }).addTo(leafletMap);
+
+      return { segment, polyline, baseStyle };
+    });
 
   checkpointMarkers = (journey.checkpoints || []).map((checkpoint, visualIndex) => {
     const markerStatus =

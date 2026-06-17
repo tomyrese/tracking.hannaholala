@@ -157,3 +157,40 @@ test('marks only the newest real checkpoint segment as active while older route 
   assert.equal(journey.segments.filter((segment) => segment.status === 'completed').length, 3);
   assert.equal(journey.segments.filter((segment) => segment.status === 'upcoming').length, 0);
 });
+
+test('deduplicates repeated checkpoint coordinates before building segments', () => {
+  const result = {
+    from_location: { lat: 10.1, long: 106.1 },
+    to_location: { lat: 10.9, long: 106.9 },
+    events: [
+      { title: 'Dang giao', lat: 10.8, lng: 106.8 },
+      { title: 'Luu kho', lat: 10.8, lng: 106.8 },
+      { title: 'Da lay hang', lat: 10.2, lng: 106.2 },
+    ],
+  };
+
+  const journey = buildMapJourney(result, { lat: 0, lng: 0 }, { lat: 1, lng: 1 });
+
+  assert.equal(journey.checkpoints.length, 2);
+  assert.equal(
+    journey.segments.some((segment) => segment.from.lat === segment.to.lat && segment.from.lng === segment.to.lng),
+    false,
+  );
+});
+
+test('keeps the newest GPS-backed event as currentCheckpoint even if a newer text-only event exists', () => {
+  const result = {
+    from_location: { lat: 10.1, long: 106.1 },
+    to_location: { lat: 10.9, long: 106.9 },
+    events: [
+      { title: 'Luu kho', detail: 'text only' },
+      { title: 'Dang giao', lat: 10.8, lng: 106.8 },
+      { title: 'Da lay hang', lat: 10.2, lng: 106.2 },
+    ],
+  };
+
+  const journey = buildMapJourney(result, { lat: 0, lng: 0 }, { lat: 1, lng: 1 });
+
+  assert.equal(journey.currentCheckpoint.title, 'Dang giao');
+  assert.deepEqual(journey.current, { lat: 10.8, lng: 106.8 });
+});

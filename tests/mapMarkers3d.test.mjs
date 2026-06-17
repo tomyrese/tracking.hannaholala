@@ -53,3 +53,15 @@ test('featured products use a centered five-column desktop grid', () => {
   assert.match(styles, /grid-template-columns:\s*repeat\(5,\s*184px\);/);
   assert.match(styles, /justify-content:\s*center;/);
 });
+
+test('destination marker stays on the recipient icon while truck focus only repositions the truck marker', () => {
+  assert.match(appSource, /const recipientIcon = createEmojiMarkerIcon\(\{[^}]*className:\s*'map-emoji-marker--recipient'/);
+  assert.match(appSource, /destinationMarker = L\.marker\(\[journey\.destination\.lat, journey\.destination\.lng\], \{/);
+  assert.match(appSource, /truckMarker\.setLatLng\(\[selectedLatLng\.lat, selectedLatLng\.lng\]\)/);
+  assert.doesNotMatch(appSource, /truckMarker\.setIcon\(recipientIcon\)/);
+});
+
+test('styles distinguish interactive and static timeline checkpoints', () => {
+  assert.match(styles, /\.timeline__item\[data-map-interactive="true"\]::after/);
+  assert.match(styles, /\.timeline__item--static\b/);
+});
