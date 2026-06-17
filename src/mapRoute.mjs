@@ -11,13 +11,17 @@ const VIETNAM_BOUNDS = {
 };
 
 const VIETNAM_CORRIDOR = [
-  { lat: 10.9, lng: 106.7 },
-  { lat: 12.2, lng: 108.2 },
-  { lat: 14.7, lng: 108.7 },
-  { lat: 16.5, lng: 108.1 },
-  { lat: 18.3, lng: 106.8 },
-  { lat: 20.2, lng: 105.6 },
-  { lat: 21.55, lng: 103.5 },
+  { lat: 10.8231, lng: 106.6297 },
+  { lat: 11.56, lng: 108.99 },
+  { lat: 13.78, lng: 109.22 },
+  { lat: 15.12, lng: 108.8 },
+  { lat: 16.47, lng: 107.58 },
+  { lat: 17.47, lng: 106.62 },
+  { lat: 18.67, lng: 105.69 },
+  { lat: 19.81, lng: 105.78 },
+  { lat: 21.0285, lng: 105.8542 },
+  { lat: 21.33, lng: 104.13 },
+  { lat: 21.5927, lng: 103.4239 },
 ];
 
 function isPointInVietnam(lat, lng) {

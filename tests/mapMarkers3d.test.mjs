@@ -34,8 +34,16 @@ test('segmented journey binds popup text from checkpoint detail', () => {
 });
 
 test('focusTimelineCheckpoint moves the truck marker to the selected real checkpoint', () => {
+  assert.match(appSource, /function applyRouteFocus\(routeModel,\s*focusedTimelineIndex = null\)/);
   assert.match(appSource, /truckMarker\.setLatLng\(\[/);
-  assert.match(appSource, /checkpointEntry\.marker\.getLatLng\(\)/);
+  assert.match(appSource, /applyRouteFocus\(currentRouteModel,\s*index\)/);
+});
+
+test('map zoom is driven by the truck and recipient display points instead of old route bounds', () => {
+  assert.match(appSource, /buildMarkerDisplayState/);
+  assert.match(appSource, /buildViewportFocusPoints/);
+  assert.match(appSource, /function fitMarkerViewport\(map,\s*markerDisplayState\)/);
+  assert.match(appSource, /fitMarkerViewport\(leafletMap,\s*markerDisplayState\)/);
 });
 
 test('phone order detail buttons reuse the last captcha proof instead of reopening captcha', () => {
@@ -56,8 +64,9 @@ test('featured products use a centered five-column desktop grid', () => {
 
 test('destination marker stays on the recipient icon while truck focus only repositions the truck marker', () => {
   assert.match(appSource, /const recipientIcon = createEmojiMarkerIcon\(\{[^}]*className:\s*'map-emoji-marker--recipient'/);
-  assert.match(appSource, /destinationMarker = L\.marker\(\[journey\.destination\.lat, journey\.destination\.lng\], \{/);
-  assert.match(appSource, /truckMarker\.setLatLng\(\[selectedLatLng\.lat, selectedLatLng\.lng\]\)/);
+  assert.match(appSource, /destinationMarker = L\.marker\(\[markerDisplayState\.recipientDisplayPoint\.lat,\s*markerDisplayState\.recipientDisplayPoint\.lng\], \{/);
+  assert.match(appSource, /recipientDisplayPoint/);
+  assert.match(appSource, /truckMarker\.setLatLng\(\[/);
   assert.doesNotMatch(appSource, /truckMarker\.setIcon\(recipientIcon\)/);
 });
 
