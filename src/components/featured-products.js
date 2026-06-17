@@ -59,7 +59,7 @@ function createCard(product) {
   `;
 }
 
-function skeletonMarkup(count = 6) {
+function skeletonMarkup(count = 4) {
   return Array.from({ length: count }, () => `
     <article class="featured-products__card featured-products__card--skeleton" aria-hidden="true">
       <div class="featured-products__media"><div class="featured-products__skeleton featured-products__skeleton--image"></div></div>
@@ -141,23 +141,17 @@ export async function mountFeaturedProducts() {
   const grid = root.querySelector('[data-featured-products-grid]');
   if (!grid) return;
 
-  grid.innerHTML = skeletonMarkup(6);
+  grid.innerHTML = skeletonMarkup(4);
 
   try {
     const payload = await fetchFeaturedProducts();
-    const products = Array.isArray(payload?.products) ? payload.products.slice(0, 12) : [];
+    const products = Array.isArray(payload?.products) ? payload.products.slice(0, 4) : [];
 
     if (!payload?.ok || products.length === 0) {
       throw new Error(payload?.message || 'Khong the tai san pham');
     }
 
-    const trackMarkup = products.map(createCard).join('');
-    grid.innerHTML = `
-      <div class="featured-products__marquee">
-        <div class="featured-products__track" data-featured-track="a">${trackMarkup}</div>
-        <div class="featured-products__track" data-featured-track="b" aria-hidden="true">${trackMarkup}</div>
-      </div>
-    `;
+    grid.innerHTML = products.map(createCard).join('');
 
     attachCardEvents(grid);
     injectProductSchema(products);
