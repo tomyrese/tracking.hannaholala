@@ -23,12 +23,17 @@ test('styles define emoji marker chips and interactive checkpoint states', () =>
 });
 
 test('segment route styles use a blue-water palette for upcoming, active, and completed progress', () => {
-  assert.match(appSource, /color:\s*'#4da3ff'/);
-  assert.match(appSource, /color:\s*'#1479ff'/);
-  assert.match(appSource, /color:\s*'#b9dcff'/);
+  assert.match(appSource, /color:\s*'#2f9bff'/);
+  assert.match(appSource, /color:\s*'#005fe0'/);
+  assert.match(appSource, /color:\s*'#7fc2ff'/);
 });
 
 test('segmented journey binds popup text from checkpoint detail', () => {
   assert.match(appSource, /checkpoint\.detail/);
   assert.match(appSource, /checkpoint\.title/);
+});
+
+test('focusTimelineCheckpoint moves the truck marker to the selected real checkpoint', () => {
+  assert.match(appSource, /truckMarker\.setLatLng\(\[/);
+  assert.match(appSource, /checkpointEntry\.marker\.getLatLng\(\)/);
 });

@@ -1197,12 +1197,12 @@ function createCheckpointIcon(status = 'upcoming') {
 
 function getSegmentStyle(status) {
   if (status === 'completed') {
-    return { color: '#b9dcff', weight: 4, opacity: 0.55 };
+    return { color: '#7fc2ff', weight: 4.5, opacity: 0.82 };
   }
   if (status === 'active') {
-    return { color: '#1479ff', weight: 6, opacity: 0.96 };
+    return { color: '#005fe0', weight: 6.5, opacity: 0.98 };
   }
-  return { color: '#4da3ff', weight: 4.5, opacity: 0.88 };
+  return { color: '#2f9bff', weight: 5.25, opacity: 0.94 };
 }
 
 function focusTimelineCheckpoint(index) {
@@ -1238,6 +1238,10 @@ function focusTimelineCheckpoint(index) {
 
   const checkpointEntry = checkpointMarkers.find((entry) => entry.timelineIndex === index);
   if (checkpointEntry) {
+    if (truckMarker) {
+      const selectedLatLng = checkpointEntry.marker.getLatLng();
+      truckMarker.setLatLng([selectedLatLng.lat, selectedLatLng.lng]);
+    }
     leafletMap.panTo(checkpointEntry.marker.getLatLng(), { animate: true, duration: 0.35 });
     checkpointEntry.marker.openPopup();
   }
