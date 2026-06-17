@@ -59,7 +59,6 @@ test('phone order detail buttons reuse the last captcha proof instead of reopeni
 });
 
 test('timeline map focus only binds interactive behavior for events with real coordinates', () => {
-  assert.match(appSource, /const isMapInteractive = Boolean\(event\.lat && event\.lng\);/);
   assert.match(appSource, /const items = timeline\.querySelectorAll\('\[data-timeline-event\]\[data-lat\]\[data-lng\]'\)/);
 });
 
@@ -77,7 +76,8 @@ test('destination marker stays on the recipient icon while truck focus only repo
 });
 
 test('delivered map state swaps to a recipient-plus-package marker and removes the truck marker', () => {
-  assert.match(appSource, /const deliveredRecipientIcon = createEmojiMarkerIcon\(\{[^}]*emoji:\s*'🤵‍♂️📦'/);
+  assert.match(appSource, /function createDeliveredRecipientIcon\(\)/);
+  assert.match(appSource, /<span class="map-emoji-marker__duo"><span>🤵‍♂️<\/span><span>📦<\/span><\/span>/);
   assert.match(appSource, /const isDeliveredJourney = isDeliveredResult\(result,\s*journey\)/);
   assert.match(appSource, /icon:\s*isDeliveredJourney\s*\?\s*deliveredRecipientIcon\s*:\s*recipientIcon/);
   assert.match(appSource, /truckMarker = markerDisplayState\.truckDisplayPoint\s*\?/);
@@ -88,6 +88,16 @@ test('styles distinguish interactive and static timeline checkpoints', () => {
   assert.match(styles, /\.timeline__item--static\b/);
   assert.match(styles, /grid-column:\s*2/);
   assert.match(styles, /Bấm để xem trên bản đồ/);
+});
+
+test('delivered timeline entry uses a dedicated summary layout while order creation stays non-interactive', () => {
+  assert.match(appSource, /function isOrderInitEvent\(title\)/);
+  assert.match(appSource, /const isDeliveredSummary = isDeliveredTimelineEvent\(event\) && index === 0/);
+  assert.match(appSource, /timeline__item--summary timeline__item--delivered/);
+  assert.match(appSource, /function prepareVisibleTimelineEvents\(result\)/);
+  assert.match(appSource, /filter\(\(event\) => readTimelinePoint\(event\) && !isOrderInitEvent\(event\.title\)\)/);
+  assert.match(styles, /\.timeline__item--summary\b/);
+  assert.match(styles, /\.timeline__item--delivered\b/);
 });
 
 test('route shape signatures support tuple coordinates returned by fetchRoadRoute', () => {

@@ -75,6 +75,53 @@ function getEventIconName(title) {
   return 'pin';
 }
 
+function isOrderInitEvent(title) {
+  const text = normalizeStatusText(title);
+  return text.includes('khoi tao don hang') || text.includes('tao don hang');
+}
+
+function isDeliveredTimelineEvent(event) {
+  const text = normalizeStatusText(event?.title);
+  return (
+    text.includes('giao thanh cong') ||
+    text.includes('giao hang thanh cong') ||
+    text.includes('delivered') ||
+    text.includes('returned')
+  );
+}
+
+function readTimelinePoint(event) {
+  const lat = Number(event?.lat);
+  const lng = Number(event?.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { lat, lng };
+}
+
+function readRecipientPoint(result) {
+  const lat = Number(result?.to_location?.lat);
+  const lng = Number(result?.to_location?.long ?? result?.to_location?.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { lat, lng };
+}
+
+function prepareVisibleTimelineEvents(result) {
+  const recipientPoint = readRecipientPoint(result);
+
+  return (result?.events || [])
+    .map((event) => {
+      if (isDeliveredTimelineEvent(event) && recipientPoint) {
+        return {
+          ...event,
+          lat: recipientPoint.lat,
+          lng: recipientPoint.lng,
+        };
+      }
+
+      return event;
+    })
+    .filter((event) => readTimelinePoint(event) && !isOrderInitEvent(event.title));
+}
+
 function timelineItem(event, index = 0) {
   const iconName = getEventIconName(event.title);
   const detail = [event.time, event.detail].filter(Boolean).join(' · ');
@@ -82,11 +129,34 @@ function timelineItem(event, index = 0) {
   const lngAttr = event.lng ? ` data-lng="${event.lng}"` : '';
   const titleAttr = ` data-title="${event.title || ''}"`;
   const indexAttr = ` data-timeline-index="${index}"`;
-  const isMapInteractive = Boolean(event.lat && event.lng);
+  const isDeliveredSummary = isDeliveredTimelineEvent(event) && index === 0;
+  const isMapInteractive = Boolean(event.lat && event.lng) && !isOrderInitEvent(event.title) && !isDeliveredSummary;
   const interactiveAttr = isMapInteractive ? ' data-map-interactive="true"' : '';
+  const itemClassName = [
+    'timeline__item',
+    !isMapInteractive ? 'timeline__item--static' : '',
+    isDeliveredSummary ? 'timeline__item--summary timeline__item--delivered' : '',
+  ].filter(Boolean).join(' ');
+
+  if (isDeliveredSummary) {
+    return `
+      <li class="${itemClassName}" data-timeline-event${indexAttr}${latAttr}${lngAttr}${titleAttr}${interactiveAttr}>
+        <span class="timeline__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">${icons[iconName]}</svg>
+        </span>
+        <div class="timeline__summary-body">
+          <div class="timeline__summary-top">
+            <strong>${event.title || 'Cập nhật hành trình'}</strong>
+            ${event.time ? `<span class="timeline__summary-time">${event.time}</span>` : ''}
+          </div>
+          <div class="timeline__detail">${event.detail || 'Đơn hàng đã được giao thành công.'}</div>
+        </div>
+      </li>
+    `;
+  }
 
   return `
-    <li class="timeline__item${isMapInteractive ? '' : ' timeline__item--static'}" data-timeline-event${indexAttr}${latAttr}${lngAttr}${titleAttr}${interactiveAttr} style="padding: 6px 8px; border-radius: 12px; transition: background-color 0.2s;">
+    <li class="${itemClassName}" data-timeline-event${indexAttr}${latAttr}${lngAttr}${titleAttr}${interactiveAttr} style="padding: 6px 8px; border-radius: 12px; transition: background-color 0.2s;">
       <span class="timeline__icon" aria-hidden="true">
         <svg viewBox="0 0 24 24">${icons[iconName]}</svg>
       </span>
@@ -253,39 +323,45 @@ function renderIdleTrackingState() {
 
 async function renderApiResult(result) {
   const carrier = result.carrier;
+  const preparedResult = result?.type === 'live'
+    ? {
+        ...result,
+        events: prepareVisibleTimelineEvents(result),
+      }
+    : result;
 
-  if (result.ok && result.type === 'phone') {
-    activeResultCode = cleanLookupCode(result.phone || result.code);
-    lastPhoneSearchResult = result;
+  if (preparedResult.ok && preparedResult.type === 'phone') {
+    activeResultCode = cleanLookupCode(preparedResult.phone || preparedResult.code);
+    lastPhoneSearchResult = preparedResult;
     backBtnContainer.innerHTML = '';
     statusIcon.dataset.state = 'success';
-    statusTitle.textContent = `Tìm thấy ${result.orders.length} đơn hàng`;
-    statusCode.textContent = `SĐT: ${result.phone}`;
-    renderPhoneOrders(result.orders);
-    helperText.innerHTML = `Đã tìm kiếm thành công danh sách đơn hàng cho SĐT ${result.phone}.`;
+    statusTitle.textContent = `Tìm thấy ${preparedResult.orders.length} đơn hàng`;
+    statusCode.textContent = `SĐT: ${preparedResult.phone}`;
+    renderPhoneOrders(preparedResult.orders);
+    helperText.innerHTML = `Đã tìm kiếm thành công danh sách đơn hàng cho SĐT ${preparedResult.phone}.`;
     return;
   }
 
-  const isLive = result.ok && result.type === 'live';
-  activeResultCode = cleanLookupCode(result.clientOrderCode || result.code);
+  const isLive = preparedResult.ok && preparedResult.type === 'live';
+  activeResultCode = cleanLookupCode(preparedResult.clientOrderCode || preparedResult.code);
 
   statusIcon.dataset.state = isLive ? 'success' : 'warning';
-  statusTitle.textContent = isLive ? result.status || 'Đã nhận dữ liệu hành trình' : result.status || 'Chưa lấy được dữ liệu';
-  statusCode.textContent = `Mã: ${result.code}`;
+  statusTitle.textContent = isLive ? preparedResult.status || 'Đã nhận dữ liệu hành trình' : preparedResult.status || 'Chưa lấy được dữ liệu';
+  statusCode.textContent = `Mã: ${preparedResult.code}`;
   
-  if (!result.ok && result.events) {
-    result.events.forEach(evt => {
+  if (!preparedResult.ok && preparedResult.events) {
+    preparedResult.events.forEach(evt => {
       evt.detail = cleanErrorMessage(evt.detail);
     });
   }
 
-  renderTimelineFromEvents(result.events, carrier);
-  await renderRoadJourneyMap(result);
+  renderTimelineFromEvents(preparedResult.events, carrier);
+  await renderRoadJourneyMap(preparedResult);
 
-  const cleanMsg = cleanErrorMessage(result.message);
+  const cleanMsg = cleanErrorMessage(preparedResult.message);
   helperText.innerHTML = isLive
     ? `${cleanMsg || 'Đã lấy dữ liệu hành trình.'}`
-    : `${cleanMsg || 'Chưa thể lấy dữ liệu.'}${result.lookupUrl ? ` · <a href="${result.lookupUrl}" target="_blank" rel="noreferrer">Tra cứu bên ngoài</a>` : ''}`;
+    : `${cleanMsg || 'Chưa thể lấy dữ liệu.'}${preparedResult.lookupUrl ? ` · <a href="${preparedResult.lookupUrl}" target="_blank" rel="noreferrer">Tra cứu bên ngoài</a>` : ''}`;
 }
 
 function updateDetection(rawCode) {
@@ -1200,6 +1276,16 @@ function createEmojiMarkerIcon({ emoji, className }) {
   });
 }
 
+function createDeliveredRecipientIcon() {
+  return L.divIcon({
+    html: `<span class="map-emoji-marker map-emoji-marker--recipient map-emoji-marker--recipient-delivered"><span class="map-emoji-marker__duo"><span>🤵‍♂️</span><span>📦</span></span></span>`,
+    className: 'map-emoji-marker-wrap',
+    iconSize: [54, 42],
+    iconAnchor: [27, 21],
+    popupAnchor: [0, -18],
+  });
+}
+
 function createCheckpointIcon(status = 'upcoming') {
   return L.divIcon({
     html: `<span class="map-checkpoint-dot map-checkpoint-dot--${status}"></span>`,
@@ -1405,7 +1491,7 @@ async function renderSegmentedJourney(journey) {
       zIndexOffset: 300 + visualIndex,
     }).addTo(leafletMap);
 
-    const popupText = [checkpoint.time, checkpoint.detail].filter(Boolean).join(' · ') || 'Cap nhat vi tri';
+    const popupText = [checkpoint.time, checkpoint.detail].filter(Boolean).join(' · ') || 'Cập nhật vị trí';
     marker.bindPopup(`<b>${checkpoint.title}</b><br>${popupText}`);
     marker.on('click', () => focusTimelineCheckpoint(checkpoint.timelineIndex));
 
@@ -1436,7 +1522,7 @@ async function renderRoadJourneyMap(result) {
   }
 
   hideMinimap();
-  container.innerHTML = '<div id="minimap-coordinates-info" style="position: absolute; bottom: 10px; left: 10px; z-index: 1000; padding: 6px 12px; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(4px); border-radius: 8px; font-size: 11px; border: 1px solid var(--line); font-weight: 500; pointer-events: none; color: var(--ink);">Cuon de thu phong · Keo de di chuyen</div>';
+  container.innerHTML = '<div id="minimap-coordinates-info" style="position: absolute; bottom: 10px; left: 10px; z-index: 1000; padding: 6px 12px; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(4px); border-radius: 8px; font-size: 11px; border: 1px solid var(--line); font-weight: 500; pointer-events: none; color: var(--ink);">Cuộn để thu phóng · Kéo để di chuyển</div>';
 
   const journey = buildMapJourney(
     result,
@@ -1466,7 +1552,7 @@ async function renderRoadJourneyMap(result) {
 
   const truckIcon = createEmojiMarkerIcon({ emoji: '🚚', className: 'map-emoji-marker--truck' });
   const recipientIcon = createEmojiMarkerIcon({ emoji: '🤵‍♂️', className: 'map-emoji-marker--recipient' });
-  const deliveredRecipientIcon = createEmojiMarkerIcon({ emoji: '🤵‍♂️📦', className: 'map-emoji-marker--recipient map-emoji-marker--recipient-delivered' });
+  const deliveredRecipientIcon = createDeliveredRecipientIcon();
   const isDeliveredJourney = isDeliveredResult(result, journey);
 
   const markerDisplayState = buildMarkerDisplayState(journey.current, journey.destination, { delivered: isDeliveredJourney });
@@ -1475,7 +1561,7 @@ async function renderRoadJourneyMap(result) {
     icon: isDeliveredJourney ? deliveredRecipientIcon : recipientIcon,
     zIndexOffset: 500,
   }).addTo(leafletMap);
-  destinationMarker.bindPopup(isDeliveredJourney ? '<b>Nguoi nhan da nhan hang</b>' : '<b>Vi tri nguoi nhan</b>');
+  destinationMarker.bindPopup(isDeliveredJourney ? '<b>✓ Người nhận đã nhận hàng</b>' : '<b>Vị trí người nhận</b>');
 
   truckMarker = markerDisplayState.truckDisplayPoint
     ? L.marker([markerDisplayState.truckDisplayPoint.lat, markerDisplayState.truckDisplayPoint.lng], {
@@ -1485,7 +1571,7 @@ async function renderRoadJourneyMap(result) {
     : null;
 
   if (truckMarker) {
-    truckMarker.bindPopup('<b>Vi tri xe hien tai</b>');
+    truckMarker.bindPopup('<b>Vị trí xe hiện tại</b>');
   }
 
   await renderSegmentedJourney(journey);

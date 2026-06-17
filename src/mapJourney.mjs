@@ -22,6 +22,20 @@ function readEventPoint(event) {
   return { lat, lng };
 }
 
+function normalizeText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/[đĐ]/gu, 'd')
+    .toLowerCase()
+    .trim();
+}
+
+function isOrderInitEvent(title) {
+  const text = normalizeText(title);
+  return text.includes('khoi tao don hang') || text.includes('tao don hang');
+}
+
 const NEAR_DESTINATION_THRESHOLD = 0.0002;
 
 function isNearPoint(a, b, threshold = NEAR_DESTINATION_THRESHOLD) {
@@ -59,6 +73,7 @@ export function buildMapJourney(result, fallbackOrigin, fallbackDestination) {
   const eventCheckpoints = dedupeCheckpoints(
     events
       .map((event, timelineIndex) => {
+        if (isOrderInitEvent(event?.title)) return null;
         const point = readEventPoint(event);
         if (!point) return null;
 

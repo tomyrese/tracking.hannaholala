@@ -194,3 +194,26 @@ test('keeps the newest GPS-backed event as currentCheckpoint even if a newer tex
   assert.equal(journey.currentCheckpoint.title, 'Dang giao');
   assert.deepEqual(journey.current, { lat: 10.8, lng: 106.8 });
 });
+
+test('does not turn order creation into an interactive checkpoint when it shares the origin point', () => {
+  const result = {
+    from_location: { lat: 10.1, long: 106.1 },
+    to_location: { lat: 10.9, long: 106.9 },
+    events: [
+      { title: 'Da lay hang', lat: 10.3, lng: 106.3 },
+      { title: 'Khoi tao don hang', lat: 10.1, lng: 106.1, detail: 'Nguoi gui: WELLHOME - FFM' },
+    ],
+  };
+
+  const journey = buildMapJourney(result, { lat: 0, lng: 0 }, { lat: 1, lng: 1 });
+
+  assert.equal(journey.checkpoints.length, 1);
+  assert.equal(journey.checkpoints[0].title, 'Da lay hang');
+  assert.deepEqual(journey.pathPoints[0], {
+    lat: 10.1,
+    lng: 106.1,
+    kind: 'origin',
+    timelineIndex: null,
+    title: 'Diem gui hang',
+  });
+});
