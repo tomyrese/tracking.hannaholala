@@ -289,3 +289,27 @@
 ### Fixes applied
 - Implemented `cleanErrorMessage` sanitization function in the core tracking API, Netlify serverless function, and frontend UI to clean up prefixes and technical codes, ensuring the user only sees friendly error notices like `Đơn hàng không tồn tại`.
 
+## Recent Updates (Emoji Markers & Segmented Route Map UI)
+### Added files
+- [2026-06-17-timeline-route-map-design.md](file:///d:/Work/HOtracking/docs/superpowers/specs/2026-06-17-timeline-route-map-design.md)
+
+### Modified files
+- [app.js](file:///d:/Work/HOtracking/src/app.js)
+- [mapJourney.mjs](file:///d:/Work/HOtracking/src/mapJourney.mjs)
+- [styles.css](file:///d:/Work/HOtracking/styles.css)
+- [tests/mapJourney.test.mjs](file:///d:/Work/HOtracking/tests/mapJourney.test.mjs)
+- [tests/mapMarkers3d.test.mjs](file:///d:/Work/HOtracking/tests/mapMarkers3d.test.mjs)
+
+### Commands executed
+- `git config --local user.name "Wuys"`
+- `git config --local user.email "phuquynguyen458@gmail.com"`
+- `node --test tests/mapJourney.test.mjs; node --test tests/mapMarkers3d.test.mjs; node --test tests/mapRoute.test.mjs; node --test tests/mapStyles.test.mjs; node --test tests/parser.test.mjs; node --test tests/vietnameseCopy.test.mjs`
+- `npm run build`
+
+### Fixes applied
+- Replaced 3D marker HTML structures with lightweight emoji markers (`🚚` for truck and `🤵‍♂️` for recipient) to streamline map styling.
+- Removed external geolocation dependency to protect user privacy and avoid prompt delays.
+- Implemented segmented route mapping showing path points, checkpoints, and current active leg.
+- Integrated chronological active markers and hover dot highlight states.
+- Verified test coverage for all map journey and checkpoint segment features.
+

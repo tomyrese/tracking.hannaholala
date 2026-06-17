@@ -79,9 +79,10 @@ function timelineItem(event, index = 0) {
   const latAttr = event.lat ? ` data-lat="${event.lat}"` : '';
   const lngAttr = event.lng ? ` data-lng="${event.lng}"` : '';
   const titleAttr = ` data-title="${event.title || ''}"`;
+  const indexAttr = ` data-timeline-index="${index}"`;
 
   return `
-    <li class="timeline__item" data-timeline-event${latAttr}${lngAttr}${titleAttr} style="cursor: pointer; padding: 6px 8px; border-radius: 12px; transition: background-color 0.2s;">
+    <li class="timeline__item" data-timeline-event${indexAttr}${latAttr}${lngAttr}${titleAttr} style="cursor: pointer; padding: 6px 8px; border-radius: 12px; transition: background-color 0.2s;">
       <span class="timeline__icon" aria-hidden="true">
         <svg viewBox="0 0 24 24">${icons[iconName]}</svg>
       </span>
@@ -123,10 +124,7 @@ function renderTimelineFromEvents(events, carrier) {
 
   timeline.innerHTML = events.map((event, index) => timelineItem(event, index)).join('');
 
-  const timelineItems = timeline.querySelectorAll('[data-timeline-event]');
-  if (timelineItems.length > 0) {
-    timelineItems[0].classList.add('active-event');
-  }
+  setActiveTimelineItem(0);
 
   if (lastPhoneSearchResult) {
     backBtnContainer.innerHTML = `

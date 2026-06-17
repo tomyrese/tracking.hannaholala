@@ -29,41 +29,93 @@ function isNearPoint(a, b, threshold = NEAR_DESTINATION_THRESHOLD) {
   return Math.abs(a.lat - b.lat) <= threshold && Math.abs(a.lng - b.lng) <= threshold;
 }
 
+function isSamePoint(a, b) {
+  return !!a && !!b && a.lat === b.lat && a.lng === b.lng;
+}
+
+function pushUniquePoint(points, point) {
+  if (!point) return;
+  const last = points[points.length - 1];
+  if (!last || last.lat !== point.lat || last.lng !== point.lng) {
+    points.push(point);
+  }
+}
+
 export function buildMapJourney(result, fallbackOrigin, fallbackDestination) {
   const events = result?.events || [];
+  const eventCheckpoints = events
+    .map((event, timelineIndex) => {
+      const point = readEventPoint(event);
+      if (!point) return null;
+
+      return {
+        lat: point.lat,
+        lng: point.lng,
+        title: event.title || 'Cap nhat hanh trinh',
+        time: event.time || '',
+        detail: event.detail || '',
+        timelineIndex,
+        kind: 'event',
+      };
+    })
+    .filter(Boolean);
+
   const origin =
     readLocationPoint(result?.from_location) ||
-    readEventPoint(events[events.length - 1]) ||
+    eventCheckpoints.at(-1) ||
     fallbackOrigin;
   const destination =
     readLocationPoint(result?.to_location) ||
-    readEventPoint(events[0]) ||
+    eventCheckpoints[0] ||
     fallbackDestination;
+  const currentCheckpoint = eventCheckpoints[0] || null;
+  const current = currentCheckpoint || origin;
+  const currentTitle = currentCheckpoint?.title || 'Vi tri gui hang (Hien tai)';
 
-  let current = origin;
-  let currentTitle = 'Vi tri gui hang (Hien tai)';
+  const pathPoints = [];
+  pushUniquePoint(pathPoints, origin ? { ...origin, kind: 'origin', timelineIndex: null, title: 'Diem gui hang' } : null);
 
-  for (const event of events) {
-    const point = readEventPoint(event);
-    if (point) {
-      current = point;
-      currentTitle = event.title || currentTitle;
-      break;
+  for (const checkpoint of [...eventCheckpoints].reverse()) {
+    pushUniquePoint(pathPoints, checkpoint);
+  }
+
+  pushUniquePoint(pathPoints, destination ? { ...destination, kind: 'destination', timelineIndex: null, title: 'Diem nhan hang' } : null);
+
+  const currentPathIndex = pathPoints.findIndex((point) => point.lat === current.lat && point.lng === current.lng);
+  const segments = [];
+
+  for (let index = 0; index < pathPoints.length - 1; index += 1) {
+    let status = 'upcoming';
+    if (currentPathIndex === -1 || currentPathIndex === pathPoints.length - 1) {
+      status = 'completed';
+    } else if (index < currentPathIndex) {
+      status = 'completed';
+    } else if (index === currentPathIndex) {
+      status = 'active';
     }
+
+    segments.push({
+      index,
+      from: { lat: pathPoints[index].lat, lng: pathPoints[index].lng },
+      to: { lat: pathPoints[index + 1].lat, lng: pathPoints[index + 1].lng },
+      fromTimelineIndex: pathPoints[index].timelineIndex,
+      toTimelineIndex: pathPoints[index + 1].timelineIndex,
+      status,
+    });
   }
 
   return {
     origin,
-    current,
+    current: current ? { lat: current.lat, lng: current.lng } : null,
     currentTitle,
     destination,
-    routeStart: current,
-    routeEnd: destination,
-    isCollapsed:
-      !!current &&
-      !!destination &&
-      current.lat === destination.lat &&
-      current.lng === destination.lng,
+    routeStart: current ? { lat: current.lat, lng: current.lng } : null,
+    routeEnd: destination ? { lat: destination.lat, lng: destination.lng } : null,
+    isCollapsed: isSamePoint(current, destination),
     isNearDestination: isNearPoint(current, destination),
+    currentCheckpoint,
+    checkpoints: eventCheckpoints,
+    pathPoints,
+    segments,
   };
 }
