@@ -11,6 +11,7 @@ test('map render uses emoji markers and removes browser geolocation dependency',
   assert.match(appSource, /createEmojiMarkerIcon/);
   assert.match(appSource, /renderSegmentedJourney/);
   assert.doesNotMatch(appSource, /navigator\.geolocation/);
+  assert.match(appSource, /let animFrameId = null;/);
 });
 
 test('styles define emoji marker chips and interactive checkpoint states', () => {

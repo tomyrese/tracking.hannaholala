@@ -624,6 +624,7 @@ let destinationMarker = null;
 let originMarker = null;
 let checkpointMarkers = [];
 let segmentPolylines = [];
+let animFrameId = null;
 let userLocation = null;
 
 function hideMinimap() {
