@@ -1203,7 +1203,14 @@ function createCheckpointIcon(status = 'upcoming') {
 
 function pointsSignature(points) {
   return points
-    .map((point) => `${point.lat.toFixed(5)},${point.lng.toFixed(5)}`)
+    .map((point) => {
+      if (Array.isArray(point)) {
+        const [lat, lng] = point;
+        return `${Number(lat).toFixed(5)},${Number(lng).toFixed(5)}`;
+      }
+
+      return `${Number(point.lat).toFixed(5)},${Number(point.lng).toFixed(5)}`;
+    })
     .join('|');
 }
 
