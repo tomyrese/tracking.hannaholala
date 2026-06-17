@@ -1,136 +1,68 @@
-function pickCoordinate(value, fallback = null) {
-  if (value === null || value === undefined || value === '') return fallback;
-  const number = Number(value);
-  return Number.isFinite(number) ? number : fallback;
-}
-
-function readLocationPoint(location) {
-  if (!location) return null;
-  const lat = pickCoordinate(location.lat);
-  const lng = pickCoordinate(location.long, pickCoordinate(location.lng));
-
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-  return { lat, lng };
-}
-
-function readEventPoint(event) {
-  if (!event) return null;
-  const lat = pickCoordinate(event.lat);
-  const lng = pickCoordinate(event.lng);
-
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-  return { lat, lng };
-}
-
-function normalizeText(value) {
-  return String(value || '')
-    .normalize('NFD')
-    .replace(/\p{Diacritic}/gu, '')
-    .replace(/[đĐ]/gu, 'd')
-    .toLowerCase()
-    .trim();
-}
-
-function isOrderInitEvent(title) {
-  const text = normalizeText(title);
-  return text.includes('khoi tao don hang') || text.includes('tao don hang');
-}
-
-const NEAR_DESTINATION_THRESHOLD = 0.0002;
-
-function isNearPoint(a, b, threshold = NEAR_DESTINATION_THRESHOLD) {
-  if (!a || !b) return false;
-  return Math.abs(a.lat - b.lat) <= threshold && Math.abs(a.lng - b.lng) <= threshold;
-}
-
-function isSamePoint(a, b) {
-  return !!a && !!b && a.lat === b.lat && a.lng === b.lng;
-}
-
-function dedupeCheckpoints(checkpoints) {
-  const unique = [];
-
-  for (const checkpoint of checkpoints) {
-    const last = unique[unique.length - 1];
-    if (!last || !isSamePoint(last, checkpoint)) {
-      unique.push(checkpoint);
-    }
-  }
-
-  return unique;
-}
-
-function pushUniquePoint(points, point) {
-  if (!point) return;
-  const last = points[points.length - 1];
-  if (!last || last.lat !== point.lat || last.lng !== point.lng) {
-    points.push(point);
-  }
-}
+import { createTrackingRouteManager } from './TrackingRouteManager.mjs';
 
 export function buildMapJourney(result, fallbackOrigin, fallbackDestination) {
-  const events = result?.events || [];
-  const eventCheckpoints = dedupeCheckpoints(
-    events
-      .map((event, timelineIndex) => {
-        if (isOrderInitEvent(event?.title)) return null;
-        const point = readEventPoint(event);
-        if (!point) return null;
+  const manager = createTrackingRouteManager(result, {
+    fallbackOrigin,
+    fallbackDestination,
+  });
 
-        return {
-          lat: point.lat,
-          lng: point.lng,
-          title: event.title || 'Cap nhat hanh trinh',
-          time: event.time || '',
-          detail: event.detail || '',
-          timelineIndex,
-          kind: 'event',
-          isCurrent: timelineIndex === 0,
-        };
-      })
-      .filter(Boolean),
-  );
+  const model = manager.model;
+  const stepsChronological = model.stepsChronological || [];
+  const currentCheckpoint = stepsChronological.at(-1) || null;
+  const routePaths = manager.updateCompletedPath(stepsChronological.length ? stepsChronological.length - 1 : 0);
 
-  const origin =
-    readLocationPoint(result?.from_location) ||
-    eventCheckpoints.at(-1) ||
-    fallbackOrigin;
-  const destination =
-    readLocationPoint(result?.to_location) ||
-    eventCheckpoints[0] ||
-    fallbackDestination;
-  const currentCheckpoint = eventCheckpoints[0] || null;
-  const current = currentCheckpoint || origin;
-  const currentTitle = currentCheckpoint?.title || 'Vi tri gui hang (Hien tai)';
+  const checkpoints = [...stepsChronological].reverse().map((step, index) => ({
+    ...step,
+    lat: step.point?.lat,
+    lng: step.point?.lng,
+    timelineIndex: index,
+  }));
 
-  const pathPoints = [];
-  pushUniquePoint(pathPoints, origin ? { ...origin, kind: 'origin', timelineIndex: null, title: 'Diem gui hang' } : null);
+  const currentTimelineIndex = checkpoints.findIndex((step) => step.stepIndex === currentCheckpoint?.stepIndex);
+  const checkpointByStepIndex = new Map(checkpoints.map((checkpoint) => [checkpoint.stepIndex, checkpoint]));
 
-  for (const checkpoint of [...eventCheckpoints].reverse()) {
-    pushUniquePoint(pathPoints, checkpoint);
-  }
+  const pathPoints = model.routePoints.map((point) => {
+    if (point.kind === 'origin') {
+      return {
+        lat: point.lat,
+        lng: point.lng,
+        kind: 'origin',
+        timelineIndex: null,
+        title: 'Diem gui hang',
+      };
+    }
 
-  pushUniquePoint(pathPoints, destination ? { ...destination, kind: 'destination', timelineIndex: null, title: 'Diem nhan hang' } : null);
+    if (point.kind === 'destination') {
+      return {
+        lat: point.lat,
+        lng: point.lng,
+        kind: 'destination',
+        timelineIndex: null,
+        title: 'Diem nhan hang',
+      };
+    }
 
-  const currentPathIndex = pathPoints.findIndex((point) => point.lat === current.lat && point.lng === current.lng);
+    const checkpoint = checkpointByStepIndex.get(point.stepIndex);
+    return {
+      lat: point.lat,
+      lng: point.lng,
+      kind: 'event',
+      timelineIndex: checkpoint?.timelineIndex ?? null,
+      title: checkpoint?.title || 'Cap nhat hanh trinh',
+    };
+  });
+
   const segments = [];
-
   for (let index = 0; index < pathPoints.length - 1; index += 1) {
     const from = pathPoints[index];
     const to = pathPoints[index + 1];
-    if (isSamePoint(from, to)) continue;
-
     let status = 'upcoming';
-    if (currentPathIndex === -1 || currentPathIndex === pathPoints.length - 1) {
-      status = 'completed';
-    } else if (index < currentPathIndex) {
-      status = 'completed';
-    } else if (index === currentPathIndex) {
-      status = 'active';
-    }
+
+    if (index < currentTimelineIndex + 1) status = 'completed';
+    else if (index === currentTimelineIndex + 1) status = 'active';
 
     segments.push({
-      index: segments.length,
+      index,
       from: { lat: from.lat, lng: from.lng },
       to: { lat: to.lat, lng: to.lng },
       fromTimelineIndex: from.timelineIndex,
@@ -140,17 +72,25 @@ export function buildMapJourney(result, fallbackOrigin, fallbackDestination) {
   }
 
   return {
-    origin,
-    current: current ? { lat: current.lat, lng: current.lng } : null,
-    currentTitle,
-    destination,
-    routeStart: current ? { lat: current.lat, lng: current.lng } : null,
-    routeEnd: destination ? { lat: destination.lat, lng: destination.lng } : null,
-    isCollapsed: isSamePoint(current, destination),
-    isNearDestination: isNearPoint(current, destination),
-    currentCheckpoint,
-    checkpoints: eventCheckpoints,
+    origin: model.origin,
+    current: model.current,
+    currentTitle: model.currentTitle,
+    destination: model.destination,
+    routeStart: model.current,
+    routeEnd: model.destination,
+    isCollapsed: model.isCollapsed,
+    isNearDestination: model.isNearDestination,
+    currentCheckpoint: currentCheckpoint
+      ? {
+          ...currentCheckpoint,
+          timelineIndex: currentTimelineIndex,
+          lat: currentCheckpoint.point?.lat,
+          lng: currentCheckpoint.point?.lng,
+        }
+      : null,
+    checkpoints,
     pathPoints,
     segments,
+    routePaths,
   };
 }

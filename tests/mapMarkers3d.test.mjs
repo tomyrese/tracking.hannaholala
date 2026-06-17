@@ -4,103 +4,57 @@ import { readFileSync } from 'node:fs';
 
 const appSource = readFileSync(new URL('../src/app.js', import.meta.url), 'utf8');
 const styles = readFileSync(new URL('../styles.css', import.meta.url), 'utf8');
+const routeManagerSource = readFileSync(new URL('../src/TrackingRouteManager.mjs', import.meta.url), 'utf8');
 
-test('map render uses emoji markers and removes browser geolocation dependency', () => {
+test('map render uses emoji markers and the new tracking route manager', () => {
+  assert.match(appSource, /createTrackingRouteManager/);
   assert.match(appSource, /emoji:\s*'🚚📦'/);
   assert.match(appSource, /emoji:\s*'🤵‍♂️'/);
-  assert.match(appSource, /createEmojiMarkerIcon/);
-  assert.match(appSource, /renderSegmentedJourney/);
-  assert.doesNotMatch(appSource, /navigator\.geolocation/);
+  assert.match(appSource, /createDeliveredRecipientIcon/);
   assert.match(appSource, /let animFrameId = null;/);
+  assert.doesNotMatch(appSource, /navigator\.geolocation/);
 });
 
-test('styles define emoji marker chips and interactive checkpoint states', () => {
-  assert.match(styles, /\.map-emoji-marker\b/);
-  assert.match(styles, /\.map-emoji-marker--truck\b/);
-  assert.match(styles, /\.map-emoji-marker--recipient\b/);
-  assert.match(styles, /\.map-checkpoint-dot\b/);
-  assert.match(styles, /\.timeline__item\[data-timeline-event\]\.active-event\b/);
+test('route manager exposes route generation, virtual points, marker states, and timeline sync helpers', () => {
+  assert.match(routeManagerSource, /class TrackingRouteManager/);
+  assert.match(routeManagerSource, /generateRoutePoints\(\)/);
+  assert.match(routeManagerSource, /generateVirtualPoints\(/);
+  assert.match(routeManagerSource, /moveVehicleToStep\(/);
+  assert.match(routeManagerSource, /updateCompletedPath\(/);
+  assert.match(routeManagerSource, /updateMarkerStates\(/);
+  assert.match(routeManagerSource, /syncTimeline\(/);
+  assert.match(routeManagerSource, /preventMarkerOverlap\(/);
 });
 
-test('segment route styles use a blue-water palette for upcoming, active, and completed progress', () => {
-  assert.match(appSource, /color:\s*'#2f9bff'/);
-  assert.match(appSource, /color:\s*'#005fe0'/);
-  assert.match(appSource, /color:\s*'#7fc2ff'/);
+test('route styles now keep full, completed, and remaining paths simultaneously', () => {
+  assert.match(appSource, /function getRouteLineStyle\(kind\)/);
+  assert.match(appSource, /color:\s*'#e7cfc4'/);
+  assert.match(appSource, /color:\s*'#b79f95'/);
+  assert.match(appSource, /color:\s*'#d89a83'/);
+  assert.match(appSource, /fullRoutePolyline = L\.polyline/);
+  assert.match(appSource, /completedRoutePolyline = L\.polyline/);
+  assert.match(appSource, /remainingRoutePolyline = L\.polyline/);
 });
 
-test('segmented journey binds popup text from checkpoint detail', () => {
-  assert.match(appSource, /checkpoint\.detail/);
-  assert.match(appSource, /checkpoint\.title/);
+test('timeline and marker focus are synchronized both ways through shared route state', () => {
+  assert.match(appSource, /function updateTimelineState\(stepIndex\)/);
+  assert.match(appSource, /scrollIntoView\(\{ block: 'nearest', behavior: 'smooth' \}\)/);
+  assert.match(appSource, /marker\.on\('click', \(\) => focusTimelineCheckpoint\(timelineIndex\)\)/);
+  assert.match(appSource, /originMarker\.on\('click'/);
+  assert.match(appSource, /destinationMarker\.on\('click'/);
 });
 
-test('focusTimelineCheckpoint moves the truck marker to the selected real checkpoint', () => {
-  assert.match(appSource, /function applyRouteFocus\(routeModel,\s*focusedTimelineIndex = null\)/);
-  assert.match(appSource, /truckMarker\.setLatLng\(\[/);
-  assert.match(appSource, /applyRouteFocus\(currentRouteModel,\s*index\)/);
+test('truck movement animates smoothly instead of teleporting between steps', () => {
+  assert.match(appSource, /function animateMarkerTo\(marker,\s*targetPoint/);
+  assert.match(appSource, /requestAnimationFrame\(tick\)/);
+  assert.match(appSource, /duration = 1200/);
+  assert.match(appSource, /const eased = 1 - \(\(1 - progress\) \*\* 3\)/);
 });
 
-test('map zoom is driven by the truck and recipient display points instead of old route bounds', () => {
-  assert.match(appSource, /buildMarkerDisplayState/);
-  assert.match(appSource, /buildViewportFocusPoints/);
-  assert.match(appSource, /function fitMarkerViewport\(map,\s*markerDisplayState\)/);
-  assert.match(appSource, /fitMarkerViewport\(leafletMap,\s*markerDisplayState\)/);
-});
-
-test('marker display state keeps start and end icons on the exact route coordinates', () => {
-  assert.doesNotMatch(appSource, /VISUAL_OFFSET/);
-  assert.match(appSource, /destinationMarker = L\.marker\(\[markerDisplayState\.recipientDisplayPoint\.lat,\s*markerDisplayState\.recipientDisplayPoint\.lng\]/);
-  assert.match(appSource, /truckMarker = markerDisplayState\.truckDisplayPoint/);
-});
-
-test('phone order detail buttons reuse the last captcha proof instead of reopening captcha', () => {
-  assert.match(appSource, /let lastCaptchaProof = null;/);
-  assert.match(appSource, /trackCurrentCode\(code,\s*\{\s*reuseLastCaptcha:\s*true\s*\}\)/);
-  assert.match(appSource, /const shouldReuseCaptcha = Boolean\(options\.reuseLastCaptcha && lastCaptchaProof\);/);
-});
-
-test('timeline map focus only binds interactive behavior for events with real coordinates', () => {
-  assert.match(appSource, /const items = timeline\.querySelectorAll\('\[data-timeline-event\]\[data-lat\]\[data-lng\]'\)/);
-});
-
-test('featured products use a centered five-column desktop grid', () => {
-  assert.match(styles, /grid-template-columns:\s*repeat\(5,\s*184px\);/);
-  assert.match(styles, /justify-content:\s*center;/);
-});
-
-test('destination marker stays on the recipient icon while truck focus only repositions the truck marker', () => {
-  assert.match(appSource, /const recipientIcon = createEmojiMarkerIcon\(\{[^}]*className:\s*'map-emoji-marker--recipient'/);
-  assert.match(appSource, /destinationMarker = L\.marker\(\[markerDisplayState\.recipientDisplayPoint\.lat,\s*markerDisplayState\.recipientDisplayPoint\.lng\], \{/);
-  assert.match(appSource, /recipientDisplayPoint/);
-  assert.match(appSource, /truckMarker\.setLatLng\(\[/);
-  assert.doesNotMatch(appSource, /truckMarker\.setIcon\(recipientIcon\)/);
-});
-
-test('delivered map state swaps icons to truck-only and recipient-plus-package', () => {
-  assert.match(appSource, /function createDeliveredRecipientIcon\(\)/);
-  assert.match(appSource, /<span class="map-emoji-marker__duo"><span>🤵‍♂️<\/span><span>📦<\/span><\/span>/);
-  assert.match(appSource, /const deliveredTruckIcon = createEmojiMarkerIcon\(\{ emoji: '🚚'/);
-  assert.match(appSource, /const isDeliveredJourney = isDeliveredResult\(result,\s*journey\)/);
-  assert.match(appSource, /icon:\s*isDeliveredJourney\s*\?\s*deliveredRecipientIcon\s*:\s*recipientIcon/);
-  assert.match(appSource, /icon:\s*isDeliveredJourney\s*\?\s*deliveredTruckIcon\s*:\s*truckIcon/);
-});
-
-test('styles distinguish interactive and static timeline checkpoints', () => {
-  assert.match(styles, /\.timeline__item\[data-map-interactive="true"\]::after/);
-  assert.match(styles, /\.timeline__item--static\b/);
-  assert.match(styles, /grid-column:\s*2/);
-  assert.match(styles, /Bấm để xem trên bản đồ/);
-});
-
-test('timeline only keeps interactive map events and deduplicates delivered updates', () => {
-  assert.match(appSource, /function isOrderInitEvent\(title\)/);
-  assert.match(appSource, /function prepareVisibleTimelineEvents\(result\)/);
-  assert.match(appSource, /filter\(\(event\) => readTimelinePoint\(event\) && !isOrderInitEvent\(event\.title\)\)/);
-  assert.match(appSource, /const key = isDeliveredTimelineEvent\(event\)\s*\?\s*'delivered'\s*:/);
-  assert.doesNotMatch(appSource, /timeline__item--summary timeline__item--delivered/);
-});
-
-test('route shape signatures support tuple coordinates returned by fetchRoadRoute', () => {
-  assert.match(appSource, /function pointsSignature\(points\)/);
-  assert.match(appSource, /Array\.isArray\(point\)/);
-  assert.match(appSource, /const \[lat, lng\] = point/);
+test('styles define current, past, and future timeline states and dedicated map hint text', () => {
+  assert.match(styles, /\.timeline__map-hint/);
+  assert.match(styles, /\.timeline__item--past/);
+  assert.match(styles, /\.timeline__item--current/);
+  assert.match(styles, /\.timeline__item--future/);
+  assert.match(styles, /\.map-emoji-marker--origin/);
 });

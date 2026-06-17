@@ -6,18 +6,17 @@ import {
   buildViewportFocusPoints,
 } from '../src/mapViewport.mjs';
 
-test('keeps truck and recipient markers pinned to their real coordinates even when the points nearly overlap', () => {
+test('separates truck and recipient markers when they nearly overlap', () => {
   const state = buildMarkerDisplayState(
-    { lat: 21.603418, lng: 103.43056 },
-    { lat: 21.60345, lng: 103.43048 },
+    { lat: 10.857213, lng: 106.70814 },
+    { lat: 10.857213, lng: 106.70814 },
   );
 
-  assert.deepEqual(state.truckDisplayPoint, { lat: 21.603418, lng: 103.43056 });
-  assert.deepEqual(state.recipientDisplayPoint, { lat: 21.60345, lng: 103.43048 });
-  assert.equal(state.hasVisualSeparation, false);
+  assert.notDeepEqual(state.truckDisplayPoint, state.recipientDisplayPoint);
+  assert.equal(state.hasVisualSeparation, true);
 });
 
-test('keeps the real positions untouched when truck and recipient are already far apart', () => {
+test('keeps real positions untouched when truck and recipient are far apart', () => {
   const state = buildMarkerDisplayState(
     { lat: 10.857213, lng: 106.7081402 },
     { lat: 21.5927453, lng: 103.4238921 },
@@ -28,26 +27,16 @@ test('keeps the real positions untouched when truck and recipient are already fa
   assert.equal(state.hasVisualSeparation, false);
 });
 
-test('viewport focus is driven by the truck and recipient markers only', () => {
+test('viewport focus can include origin, truck, and recipient points together', () => {
   const focusPoints = buildViewportFocusPoints({
+    originDisplayPoint: { lat: 10.1, lng: 106.1 },
     truckDisplayPoint: { lat: 10.857213, lng: 106.7081402 },
     recipientDisplayPoint: { lat: 21.5927453, lng: 103.4238921 },
   });
 
   assert.deepEqual(focusPoints, [
+    [10.1, 106.1],
     [10.857213, 106.7081402],
     [21.5927453, 103.4238921],
   ]);
-});
-
-test('delivered state keeps both truck and recipient markers pinned to the real delivery point', () => {
-  const state = buildMarkerDisplayState(
-    { lat: 10.857213, lng: 106.7081402 },
-    { lat: 10.857213, lng: 106.7081402 },
-    { delivered: true },
-  );
-
-  assert.deepEqual(state.truckDisplayPoint, { lat: 10.857213, lng: 106.7081402 });
-  assert.deepEqual(state.recipientDisplayPoint, { lat: 10.857213, lng: 106.7081402 });
-  assert.equal(state.hasVisualSeparation, false);
 });

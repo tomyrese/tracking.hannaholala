@@ -1075,9 +1075,18 @@ h1 {
 }
 
 .timeline__item[data-map-interactive="true"]::after {
-  content: 'Bấm để xem trên bản đồ';
+  content: '';
+  display: none;
+}
+
+.timeline__item[data-map-interactive="true"].active-event,
+.timeline__item[data-timeline-event].active-event {
+  background-color: rgba(238, 217, 209, 0.75);
+  box-shadow: 0 0 0 1px rgba(217, 183, 169, 0.18);
+}
+
+.timeline__map-hint {
   display: block;
-  grid-column: 2;
   margin-top: 6px;
   color: #9b6b5c;
   font-size: 11px;
@@ -1085,10 +1094,20 @@ h1 {
   line-height: 1.3;
 }
 
-.timeline__item[data-map-interactive="true"].active-event,
-.timeline__item[data-timeline-event].active-event {
-  background-color: rgba(238, 217, 209, 0.75);
-  box-shadow: 0 0 0 1px rgba(217, 183, 169, 0.18);
+.timeline__item--past {
+  opacity: 0.72;
+}
+
+.timeline__item--current {
+  opacity: 1;
+  border-color: rgba(183, 159, 149, 0.9);
+  box-shadow:
+    0 10px 24px rgba(183, 159, 149, 0.18),
+    0 0 0 1px rgba(183, 159, 149, 0.24);
+}
+
+.timeline__item--future {
+  opacity: 1;
 }
 
 .map-emoji-marker-wrap,
@@ -1112,6 +1131,10 @@ h1 {
 
 .map-emoji-marker--truck {
   background: linear-gradient(180deg, #2d2d2d 0%, #111 100%);
+}
+
+.map-emoji-marker--origin {
+  background: linear-gradient(180deg, #4a403b 0%, #241d1a 100%);
 }
 
 .map-emoji-marker--recipient {

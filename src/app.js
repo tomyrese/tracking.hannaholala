@@ -1,6 +1,7 @@
 import { detectCarrier } from './detectCarrier.mjs';
 import { buildMapJourney } from './mapJourney.mjs';
 import { fetchRoadRoute } from './mapRoute.mjs';
+import { createTrackingRouteManager } from './TrackingRouteManager.mjs';
 import { buildMarkerDisplayState, buildViewportFocusPoints } from './mapViewport.mjs';
 import { mountFeaturedProducts } from './components/featured-products.js';
 
@@ -105,32 +106,22 @@ function readRecipientPoint(result) {
 }
 
 function prepareVisibleTimelineEvents(result) {
-  const recipientPoint = readRecipientPoint(result);
-  const seenKeys = new Set();
+  const manager = createTrackingRouteManager(result, {
+    fallbackOrigin: { lat: 21.0285, lng: 105.8542 },
+    fallbackDestination: { lat: 10.8231, lng: 106.6297 },
+  });
 
-  return (result?.events || [])
-    .map((event) => {
-      if (isDeliveredTimelineEvent(event) && recipientPoint) {
-        return {
-          ...event,
-          lat: recipientPoint.lat,
-          lng: recipientPoint.lng,
-        };
-      }
-
-      return event;
-    })
-    .filter((event) => readTimelinePoint(event) && !isOrderInitEvent(event.title))
-    .filter((event) => {
-      const point = readTimelinePoint(event);
-      const key = isDeliveredTimelineEvent(event)
-        ? 'delivered'
-        : `${normalizeStatusText(event.title)}|${point.lat}|${point.lng}`;
-
-      if (seenKeys.has(key)) return false;
-      seenKeys.add(key);
-      return true;
-    });
+  return manager.syncTimeline(manager.activeStepIndex).map((step, index) => ({
+    title: step.title,
+    time: step.time,
+    detail: step.detail,
+    lat: step.point?.lat,
+    lng: step.point?.lng,
+    timelineIndex: index,
+    isVirtual: Boolean(step.isVirtual),
+    isCurrent: Boolean(step.isCurrent),
+    timelineState: step.timelineState,
+  }));
 }
 
 function timelineItem(event, index = 0) {
@@ -140,12 +131,14 @@ function timelineItem(event, index = 0) {
   const lngAttr = event.lng ? ` data-lng="${event.lng}"` : '';
   const titleAttr = ` data-title="${event.title || ''}"`;
   const indexAttr = ` data-timeline-index="${index}"`;
-  const isMapInteractive = Boolean(event.lat && event.lng) && !isOrderInitEvent(event.title);
+  const isMapInteractive = Boolean(event.lat && event.lng);
   const interactiveAttr = isMapInteractive ? ' data-map-interactive="true"' : '';
   const itemClassName = [
     'timeline__item',
     !isMapInteractive ? 'timeline__item--static' : '',
+    event.timelineState ? `timeline__item--${event.timelineState}` : '',
   ].filter(Boolean).join(' ');
+  const clickHint = isMapInteractive ? '<span class="timeline__map-hint">Bấm để xem trên bản đồ</span>' : '';
 
   return `
     <li class="${itemClassName}" data-timeline-event${indexAttr}${latAttr}${lngAttr}${titleAttr}${interactiveAttr} style="padding: 6px 8px; border-radius: 12px; transition: background-color 0.2s;">
@@ -155,6 +148,7 @@ function timelineItem(event, index = 0) {
       <div>
         <strong>${event.title || 'Cập nhật hành trình'}</strong>
         <div class="timeline__detail">${detail || 'Đã nhận dữ liệu từ GHN.'}</div>
+        ${clickHint}
       </div>
     </li>
   `;
@@ -702,6 +696,9 @@ let segmentPolylines = [];
 let currentRouteModel = null;
 let animFrameId = null;
 let userLocation = null;
+let fullRoutePolyline = null;
+let completedRoutePolyline = null;
+let remainingRoutePolyline = null;
 
 function hideMinimap() {
   const minimapCard = document.querySelector('.minimap-card');
@@ -1324,44 +1321,6 @@ function isDeliveredResult(result, journey) {
   );
 }
 
-function getSegmentStyle(status) {
-  if (status === 'completed') {
-    return { color: '#7fc2ff', weight: 4.5, opacity: 0.82 };
-  }
-  if (status === 'active') {
-    return { color: '#005fe0', weight: 6.5, opacity: 0.98 };
-  }
-  return { color: '#2f9bff', weight: 5.25, opacity: 0.94 };
-}
-
-function findCheckpointByTimelineIndex(journey, index) {
-  return (journey?.checkpoints || []).find((checkpoint) => checkpoint.timelineIndex === index) || null;
-}
-
-function isSegmentRelatedToTimelineIndex(segment, index) {
-  return segment.fromTimelineIndex === index || segment.toTimelineIndex === index;
-}
-
-function buildRenderedSegmentStyle(segment, focusedTimelineIndex = null) {
-  const baseStyle = getSegmentStyle(segment.status);
-  if (focusedTimelineIndex === null || focusedTimelineIndex === undefined) {
-    return baseStyle;
-  }
-
-  if (isSegmentRelatedToTimelineIndex(segment, focusedTimelineIndex)) {
-    return {
-      ...baseStyle,
-      weight: baseStyle.weight + 1.5,
-      opacity: Math.min(1, baseStyle.opacity + 0.12),
-    };
-  }
-
-  return {
-    ...baseStyle,
-    opacity: Math.min(baseStyle.opacity, 0.28),
-  };
-}
-
 function fitMarkerViewport(map, markerDisplayState) {
   if (!map || !markerDisplayState) return;
 
@@ -1382,47 +1341,195 @@ function fitMarkerViewport(map, markerDisplayState) {
   });
 }
 
+function getRouteLineStyle(kind) {
+  if (kind === 'completed') {
+    return { color: '#b79f95', weight: 6, opacity: 0.35 };
+  }
+  if (kind === 'remaining') {
+    return { color: '#d89a83', weight: 6, opacity: 0.9 };
+  }
+  return { color: '#e7cfc4', weight: 7, opacity: 0.95 };
+}
+
+function getCheckpointVisualState(stepIndex) {
+  if (!currentRouteModel?.manager) return 'upcoming';
+  if (stepIndex < currentRouteModel.manager.activeStepIndex) return 'completed';
+  if (stepIndex === currentRouteModel.manager.activeStepIndex) return 'active';
+  return 'upcoming';
+}
+
+function createRouteStepMarkerIcon(step) {
+  if (step.phase === 'order_created') {
+    return createEmojiMarkerIcon({ emoji: '🚚📦', className: 'map-emoji-marker--truck map-emoji-marker--origin' });
+  }
+
+  if (step.phase === 'delivered') {
+    return createDeliveredRecipientIcon();
+  }
+
+  return createCheckpointIcon(getCheckpointVisualState(step.stepIndex));
+}
+
+function buildStepPopup(step) {
+  const detail = [step.time, step.detail].filter(Boolean).join(' · ');
+  if (step.phase === 'delivered') {
+    const cod = currentRouteModel?.result?.cod_amount
+      ? `<br>COD: ${Number(currentRouteModel.result.cod_amount).toLocaleString('vi-VN')}đ`
+      : '';
+    return `<b>Giao thành công</b><br>${detail || 'Đơn hàng đã được giao thành công.'}${cod}`;
+  }
+
+  return `<b>${step.title}</b><br>${detail || 'Bấm để xem vị trí trên bản đồ.'}`;
+}
+
+function findTimelineIndexForStep(stepIndex) {
+  return currentRouteModel?.timelineSteps?.findIndex((step) => step.stepIndex === stepIndex) ?? -1;
+}
+
+function updateTimelineState(stepIndex) {
+  const items = Array.from(timeline.querySelectorAll('[data-timeline-event]'));
+  const activeTimelineIndex = currentRouteModel.timelineSteps.findIndex((step) => step.stepIndex === stepIndex);
+
+  items.forEach((item) => {
+    const itemIndex = Number(item.dataset.timelineIndex);
+    item.classList.toggle('active-event', itemIndex === activeTimelineIndex);
+    item.classList.toggle('timeline__item--past', itemIndex > activeTimelineIndex);
+    item.classList.toggle('timeline__item--current', itemIndex === activeTimelineIndex);
+    item.classList.toggle('timeline__item--future', itemIndex < activeTimelineIndex);
+  });
+
+  const activeItem = items.find((item) => Number(item.dataset.timelineIndex) === activeTimelineIndex);
+  activeItem?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+function updateCheckpointMarkerStates() {
+  for (const entry of checkpointMarkers) {
+    entry.marker.setIcon(createRouteStepMarkerIcon(entry.step));
+  }
+}
+
+function updateRoutePolylines(stepIndex) {
+  if (!currentRouteModel?.manager) return;
+  const routePaths = currentRouteModel.manager.updateCompletedPath(stepIndex);
+
+  if (fullRoutePolyline) fullRoutePolyline.setLatLngs(routePaths.full);
+  if (completedRoutePolyline) completedRoutePolyline.setLatLngs(routePaths.completed);
+  if (remainingRoutePolyline) remainingRoutePolyline.setLatLngs(routePaths.remaining);
+}
+
+function animateMarkerTo(marker, targetPoint, options = {}) {
+  const { duration = 1200, onFrame = null, onDone = null } = options;
+  if (!marker || !targetPoint) {
+    onDone?.();
+    return;
+  }
+
+  if (animFrameId) {
+    cancelAnimationFrame(animFrameId);
+    animFrameId = null;
+  }
+
+  const start = marker.getLatLng();
+  const startLat = start.lat;
+  const startLng = start.lng;
+  const targetLat = targetPoint.lat;
+  const targetLng = targetPoint.lng;
+  const startedAt = performance.now();
+
+  const tick = (now) => {
+    const progress = Math.min(1, (now - startedAt) / duration);
+    const eased = 1 - ((1 - progress) ** 3);
+    const nextLat = startLat + ((targetLat - startLat) * eased);
+    const nextLng = startLng + ((targetLng - startLng) * eased);
+    marker.setLatLng([nextLat, nextLng]);
+    onFrame?.({ lat: nextLat, lng: nextLng }, progress);
+
+    if (progress < 1) {
+      animFrameId = requestAnimationFrame(tick);
+      return;
+    }
+
+    animFrameId = null;
+    onDone?.();
+  };
+
+  animFrameId = requestAnimationFrame(tick);
+}
+
 function applyRouteFocus(routeModel, focusedTimelineIndex = null) {
-  if (!leafletMap || !routeModel) return;
+  if (!leafletMap || !routeModel?.manager) return;
 
-  const checkpoint = focusedTimelineIndex === null
-    ? null
-    : findCheckpointByTimelineIndex(routeModel.journey, focusedTimelineIndex);
-  const truckPoint = checkpoint
-    ? { lat: checkpoint.lat, lng: checkpoint.lng }
-    : routeModel.journey.current;
-  const markerDisplayState = buildMarkerDisplayState(truckPoint, routeModel.journey.destination);
+  const targetTimelineIndex = focusedTimelineIndex ?? 0;
+  const targetTimelineStep = routeModel.timelineSteps[targetTimelineIndex];
+  if (!targetTimelineStep) return;
 
-  for (const item of segmentPolylines) {
-    item.polyline.setStyle(buildRenderedSegmentStyle(item.segment, focusedTimelineIndex));
+  const moveState = routeModel.manager.moveVehicleToStep(targetTimelineStep.stepIndex);
+  const markerState = routeModel.manager.updateMarkerStates(targetTimelineStep.stepIndex);
+
+  updateTimelineState(targetTimelineStep.stepIndex);
+  updateCheckpointMarkerStates();
+  updateRoutePolylines(targetTimelineStep.stepIndex);
+
+  const applyDisplayState = (animatedPoint = null) => {
+    const displayState = buildMarkerDisplayState(
+      animatedPoint || moveState.truckPoint,
+      markerState.recipientPoint,
+      { delivered: markerState.delivered },
+    );
+
+    if (destinationMarker && displayState.recipientDisplayPoint) {
+      destinationMarker.setLatLng([
+        displayState.recipientDisplayPoint.lat,
+        displayState.recipientDisplayPoint.lng,
+      ]);
+    }
+
+    fitMarkerViewport(leafletMap, {
+      ...displayState,
+      originDisplayPoint: routeModel.originPoint,
+    });
+  };
+
+  if (destinationMarker) {
+    destinationMarker.setIcon(
+      markerState.delivered
+        ? createDeliveredRecipientIcon()
+        : createEmojiMarkerIcon({ emoji: '🤵‍♂️', className: 'map-emoji-marker--recipient' }),
+    );
   }
 
-  if (truckMarker && markerDisplayState.truckDisplayPoint) {
-    truckMarker.setLatLng([
-      markerDisplayState.truckDisplayPoint.lat,
-      markerDisplayState.truckDisplayPoint.lng,
-    ]);
+  if (truckMarker) {
+    truckMarker.setIcon(createEmojiMarkerIcon({
+      emoji: markerState.truckEmoji,
+      className: 'map-emoji-marker--truck',
+    }));
+
+    animateMarkerTo(truckMarker, markerState.truckDisplayPoint, {
+      duration: 1200,
+      onFrame: (point) => applyDisplayState(point),
+      onDone: () => applyDisplayState(markerState.truckDisplayPoint),
+    });
   }
 
-  if (destinationMarker && markerDisplayState.recipientDisplayPoint) {
-    destinationMarker.setLatLng([
-      markerDisplayState.recipientDisplayPoint.lat,
-      markerDisplayState.recipientDisplayPoint.lng,
-    ]);
+  const checkpointEntry = checkpointMarkers.find((entry) => entry.timelineIndex === targetTimelineIndex);
+  if (checkpointEntry) {
+    checkpointEntry.marker.openPopup();
+    return;
   }
 
-  fitMarkerViewport(leafletMap, markerDisplayState);
+  if (targetTimelineStep.phase === 'order_created') {
+    originMarker?.openPopup();
+    return;
+  }
+
+  if (targetTimelineStep.phase === 'delivered') {
+    destinationMarker?.openPopup();
+  }
 }
 
 function focusTimelineCheckpoint(index) {
   if (!leafletMap || !currentRouteModel) return;
-  setActiveTimelineItem(index);
   applyRouteFocus(currentRouteModel, index);
-
-  const checkpointEntry = checkpointMarkers.find((entry) => entry.timelineIndex === index);
-  if (checkpointEntry) {
-    checkpointEntry.marker.openPopup();
-  }
 }
 
 function bindTimelineMapFocus() {
@@ -1435,65 +1542,94 @@ function bindTimelineMapFocus() {
 }
 
 async function renderSegmentedJourney(journey) {
-  const segmentRoutes = await Promise.all(
-    (journey.segments || []).map(async (segment) => {
-      const routePoints = await fetchRoadRoute(fetch, segment.from, segment.to);
-      return {
-        segment,
-        points: snapRouteEndpoints(routePoints, segment.from, segment.to),
-      };
-    }),
-  );
+  const manager = createTrackingRouteManager(currentRouteModel.result, {
+    fallbackOrigin: journey.origin,
+    fallbackDestination: journey.destination,
+  });
+  currentRouteModel.manager = manager;
+  currentRouteModel.timelineSteps = manager.timelineSteps;
+  currentRouteModel.originPoint = manager.model.origin;
 
-  const seenRouteShapes = new Set();
+  const routeSegments = [];
+  for (let index = 0; index < manager.model.routePoints.length - 1; index += 1) {
+    const from = manager.model.routePoints[index];
+    const to = manager.model.routePoints[index + 1];
+    const routePoints = snapRouteEndpoints(
+      await fetchRoadRoute(fetch, from, to),
+      from,
+      to,
+    );
+    routeSegments.push(...routePoints.map((point) => Array.isArray(point) ? point : [point.lat, point.lng]));
+  }
 
-  segmentPolylines = segmentRoutes
-    .filter(({ points }) => {
-      const signature = pointsSignature(points);
-      if (seenRouteShapes.has(signature)) return false;
-      seenRouteShapes.add(signature);
-      return true;
-    })
-    .map(({ segment, points }) => {
-      const baseStyle = getSegmentStyle(segment.status);
-      const polyline = L.polyline(points, {
-        ...buildRenderedSegmentStyle(segment),
-        lineJoin: 'round',
-        lineCap: 'round',
+  const dedupedRoute = [];
+  for (const point of routeSegments) {
+    const last = dedupedRoute[dedupedRoute.length - 1];
+    if (!last || last[0] !== point[0] || last[1] !== point[1]) {
+      dedupedRoute.push(point);
+    }
+  }
+
+  fullRoutePolyline = L.polyline(dedupedRoute, {
+    ...getRouteLineStyle('base'),
+    lineJoin: 'round',
+    lineCap: 'round',
+  }).addTo(leafletMap);
+
+  completedRoutePolyline = L.polyline([], {
+    ...getRouteLineStyle('completed'),
+    lineJoin: 'round',
+    lineCap: 'round',
+  }).addTo(leafletMap);
+
+  remainingRoutePolyline = L.polyline([], {
+    ...getRouteLineStyle('remaining'),
+    lineJoin: 'round',
+    lineCap: 'round',
+  }).addTo(leafletMap);
+
+  checkpointMarkers = manager.timelineSteps
+    .filter((step) => step.phase !== 'order_created' && step.phase !== 'delivered')
+    .map((step, visualIndex) => {
+      const timelineIndex = manager.timelineSteps.findIndex((entry) => entry.stepIndex === step.stepIndex);
+      const marker = L.marker([step.point.lat, step.point.lng], {
+        icon: createRouteStepMarkerIcon(step),
+        zIndexOffset: 300 + visualIndex,
       }).addTo(leafletMap);
 
-      return { segment, polyline, baseStyle };
+      marker.bindPopup(buildStepPopup(step));
+      marker.on('click', () => focusTimelineCheckpoint(timelineIndex));
+
+      return { timelineIndex, marker, step };
     });
 
-  currentRouteModel = {
-    journey,
-    segmentRoutes,
-  };
+  const orderCreatedStep = manager.timelineSteps.find((step) => step.phase === 'order_created');
+  if (orderCreatedStep && originMarker) {
+    originMarker.on('click', () => {
+      focusTimelineCheckpoint(findTimelineIndexForStep(orderCreatedStep.stepIndex));
+      originMarker.openPopup();
+    });
+  }
 
-  checkpointMarkers = (journey.checkpoints || []).map((checkpoint, visualIndex) => {
-    const markerStatus =
-      checkpoint.timelineIndex < (journey.currentCheckpoint?.timelineIndex ?? Infinity)
-        ? 'completed'
-        : checkpoint.timelineIndex === journey.currentCheckpoint?.timelineIndex
-          ? 'active'
-          : 'upcoming';
-
-    const marker = L.marker([checkpoint.lat, checkpoint.lng], {
-      icon: createCheckpointIcon(markerStatus),
-      zIndexOffset: 300 + visualIndex,
-    }).addTo(leafletMap);
-
-    const popupText = [checkpoint.time, checkpoint.detail].filter(Boolean).join(' · ') || 'Cập nhật vị trí';
-    marker.bindPopup(`<b>${checkpoint.title}</b><br>${popupText}`);
-    marker.on('click', () => focusTimelineCheckpoint(checkpoint.timelineIndex));
-
-    return { timelineIndex: checkpoint.timelineIndex, marker };
-  });
+  const deliveredStep = manager.timelineSteps.find((step) => step.phase === 'delivered');
+  if (deliveredStep && destinationMarker) {
+    destinationMarker.bindPopup(buildStepPopup(deliveredStep));
+    destinationMarker.on('click', () => {
+      focusTimelineCheckpoint(findTimelineIndexForStep(deliveredStep.stepIndex));
+      destinationMarker.openPopup();
+    });
+  }
 }
 
-function fitSegmentedJourney(map, journey) {
-  if (!map || !journey?.current || !journey?.destination) return;
-  fitMarkerViewport(map, buildMarkerDisplayState(journey.current, journey.destination));
+function fitSegmentedJourney(map) {
+  if (!map || !currentRouteModel?.manager) return;
+  const markerState = currentRouteModel.manager.updateMarkerStates(currentRouteModel.manager.activeStepIndex);
+  fitMarkerViewport(map, {
+    truckDisplayPoint: markerState.truckDisplayPoint,
+    recipientDisplayPoint: markerState.recipientDisplayPoint,
+    originDisplayPoint: currentRouteModel.originPoint,
+    hasVisualSeparation: markerState.hasVisualSeparation,
+  });
 }
 
 async function renderRoadJourneyMap(result) {
@@ -1548,7 +1684,21 @@ async function renderRoadJourneyMap(result) {
   const deliveredRecipientIcon = createDeliveredRecipientIcon();
   const isDeliveredJourney = isDeliveredResult(result, journey);
 
+  currentRouteModel = {
+    result,
+    journey,
+    manager: null,
+    timelineSteps: [],
+    originPoint: journey.origin,
+  };
+
   const markerDisplayState = buildMarkerDisplayState(journey.current, journey.destination, { delivered: isDeliveredJourney });
+
+  originMarker = L.marker([journey.origin.lat, journey.origin.lng], {
+    icon: createEmojiMarkerIcon({ emoji: '🚚📦', className: 'map-emoji-marker--truck map-emoji-marker--origin' }),
+    zIndexOffset: 200,
+  }).addTo(leafletMap);
+  originMarker.bindPopup('<b>Kho gửi hàng</b>');
 
   destinationMarker = L.marker([markerDisplayState.recipientDisplayPoint.lat, markerDisplayState.recipientDisplayPoint.lng], {
     icon: isDeliveredJourney ? deliveredRecipientIcon : recipientIcon,
@@ -1568,12 +1718,11 @@ async function renderRoadJourneyMap(result) {
   }
 
   await renderSegmentedJourney(journey);
-  fitSegmentedJourney(leafletMap, journey);
+  fitSegmentedJourney(leafletMap);
   bindTimelineMapFocus();
 
-  if (journey.currentCheckpoint) {
-    setActiveTimelineItem(journey.currentCheckpoint.timelineIndex);
-    applyRouteFocus(currentRouteModel, journey.currentCheckpoint.timelineIndex);
+  if (currentRouteModel.timelineSteps.length) {
+    applyRouteFocus(currentRouteModel, 0);
   } else {
     applyRouteFocus(currentRouteModel, null);
   }
