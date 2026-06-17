@@ -7,6 +7,7 @@ function normalizeText(value) {
   return String(value || '')
     .normalize('NFD')
     .replace(/\p{Diacritic}/gu, '')
+    .replace(/[đĐ]/gu, 'd')
     .toLowerCase();
 }
 
@@ -46,4 +47,64 @@ test('buildTimeline keeps only the newest delivered milestone when delivery comp
   const deliveredEvents = events.filter((event) => normalizeText(event.title).includes('giao') && normalizeText(event.title).includes('thanh cong'));
   assert.equal(deliveredEvents.length, 1);
   assert.equal(deliveredEvents[0]?.detail.includes('Thuy'), true);
+});
+
+test('buildTimeline compresses many GHN raw statuses into one event per shipping phase', () => {
+  const events = buildTimelineForDisplay({
+    status: 'delivering',
+    updated_date: '2026-06-17T08:10:00.000Z',
+    leadtime: '2026-06-17T09:00:00.000Z',
+    log: [
+      { status: 'picking', updated_date: '2026-06-16T07:00:00.000Z', driver_name: 'A' },
+      { status: 'money_collect_picking', updated_date: '2026-06-16T07:05:00.000Z', driver_name: 'A' },
+      { status: 'picked', updated_date: '2026-06-16T07:10:00.000Z', driver_name: 'A' },
+      { status: 'storing', updated_date: '2026-06-16T08:00:00.000Z' },
+      { status: 'transporting', updated_date: '2026-06-16T12:00:00.000Z' },
+      { status: 'storing', updated_date: '2026-06-16T18:00:00.000Z' },
+      { status: 'delivering', updated_date: '2026-06-17T08:00:00.000Z', note: 'Dang giao' },
+      { status: 'money_collect_delivering', updated_date: '2026-06-17T08:10:00.000Z', note: 'Thu tien' },
+    ],
+  });
+
+  const normalizedTitles = events.map((event) => normalizeText(event.title));
+  assert.equal(normalizedTitles.filter((title) => title.includes('lay hang')).length, 1);
+  assert.equal(normalizedTitles.filter((title) => title.includes('luan chuyen')).length, 1);
+  assert.equal(normalizedTitles.filter((title) => title.includes('dang giao')).length, 1);
+});
+
+test('buildTimeline hides leadtime after the order is already finished', () => {
+  const events = buildTimelineForDisplay({
+    status: 'delivered',
+    updated_date: '2026-06-17T10:00:00.000Z',
+    finish_date: '2026-06-17T10:00:00.000Z',
+    leadtime: '2026-06-17T11:00:00.000Z',
+    to_name: 'Thuy',
+    log: [
+      { status: 'picked', updated_date: '2026-06-16T07:10:00.000Z' },
+      { status: 'transporting', updated_date: '2026-06-16T12:00:00.000Z' },
+      { status: 'delivered', updated_date: '2026-06-17T10:00:00.000Z', note: 'Nguoi nhan: Thuy' },
+    ],
+  });
+
+  assert.equal(events.some((event) => normalizeText(event.title).includes('du kien giao hang')), false);
+});
+
+test('buildTimeline keeps only the return flow once the order has entered return states', () => {
+  const events = buildTimelineForDisplay({
+    status: 'return',
+    updated_date: '2026-06-17T10:00:00.000Z',
+    leadtime: '2026-06-17T11:00:00.000Z',
+    log: [
+      { status: 'picked', updated_date: '2026-06-16T07:10:00.000Z' },
+      { status: 'transporting', updated_date: '2026-06-16T12:00:00.000Z' },
+      { status: 'delivery_fail', updated_date: '2026-06-17T08:00:00.000Z', reason: 'Khach hen lai' },
+      { status: 'waiting_to_return', updated_date: '2026-06-17T08:30:00.000Z' },
+      { status: 'return_transporting', updated_date: '2026-06-17T09:00:00.000Z' },
+      { status: 'return', updated_date: '2026-06-17T10:00:00.000Z' },
+    ],
+  });
+
+  const normalizedTitles = events.map((event) => normalizeText(event.title));
+  assert.equal(normalizedTitles.some((title) => title.includes('du kien giao hang')), false);
+  assert.equal(normalizedTitles.filter((title) => title.includes('tra')).length, 1);
 });
