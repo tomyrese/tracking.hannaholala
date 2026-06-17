@@ -29,8 +29,14 @@ loadEnvFile();
 
 console.log('[Build] Running pre-build GHN order synchronization...');
 try {
-  await syncGhnOrders();
-  console.log('[Build] Pre-build synchronization successfully completed.');
+  const result = await syncGhnOrders();
+  if (result?.ok) {
+    console.log(`[Build] Pre-build synchronization successfully completed. Added: ${result.addedCount}, Updated: ${result.updatedCount}, Total: ${result.totalOrders}`);
+  } else if (result?.skipped) {
+    console.warn(`[Build] Pre-build synchronization skipped: ${result.detail}`);
+  } else {
+    console.error(`[Build] Pre-build synchronization failed: ${result?.detail || 'Unknown sync error.'}`);
+  }
 } catch (error) {
   console.error('[Build] Pre-build synchronization failed:', error.message);
 }
