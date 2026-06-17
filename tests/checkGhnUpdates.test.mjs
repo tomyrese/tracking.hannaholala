@@ -19,6 +19,7 @@ test('triggerBuildHook skips cleanly when NETLIFY_BUILD_HOOK_URL is missing', as
       triggered: false,
       skipped: true,
       reason: 'missing_build_hook_url',
+      detail: null,
     });
     assert.equal(fetchCalled, false);
   } finally {
@@ -38,6 +39,7 @@ test('runScheduledSync returns success metadata when rebuild is needed but build
       triggered: false,
       skipped: true,
       reason: 'missing_build_hook_url',
+      detail: null,
     }),
   });
 
@@ -49,6 +51,8 @@ test('runScheduledSync returns success metadata when rebuild is needed but build
   assert.equal(result.latestCount, 1);
   assert.equal(result.syncSkipped, false);
   assert.equal(result.syncSkipReason, null);
+  assert.equal(result.syncSkipDetail, null);
+  assert.equal(result.buildHookDetail, null);
 });
 
 test('runScheduledSync does not trigger a build hook when nothing meaningful changed', async () => {
@@ -59,7 +63,7 @@ test('runScheduledSync does not trigger a build hook when nothing meaningful cha
     readLatestOrders: async () => ({ orders: [{ order_code: 'A001', status: 'ready_to_pick', updated_date: '2026-06-17T01:00:00.000Z' }], skipped: false, reason: null }),
     triggerRebuild: async () => {
       triggerCalled = true;
-      return { triggered: true, skipped: false, reason: null };
+      return { triggered: true, skipped: false, reason: null, detail: null };
     },
   });
 
@@ -67,6 +71,8 @@ test('runScheduledSync does not trigger a build hook when nothing meaningful cha
   assert.equal(result.rebuildTriggered, false);
   assert.equal(result.buildHookSkipped, false);
   assert.equal(result.buildHookReason, null);
+  assert.equal(result.syncSkipDetail, null);
+  assert.equal(result.buildHookDetail, null);
   assert.equal(triggerCalled, false);
 });
 
@@ -82,13 +88,55 @@ test('runScheduledSync skips cleanly when GHN credentials are missing', async ()
     }),
     triggerRebuild: async () => {
       triggerCalled = true;
-      return { triggered: true, skipped: false, reason: null };
+      return { triggered: true, skipped: false, reason: null, detail: null };
     },
   });
 
   assert.equal(result.syncSkipped, true);
   assert.equal(result.syncSkipReason, 'missing_ghn_credentials');
+  assert.equal(result.syncSkipDetail, null);
   assert.equal(result.rebuildNeeded, false);
   assert.equal(result.rebuildTriggered, false);
   assert.equal(triggerCalled, false);
+});
+
+test('runScheduledSync soft-fails when GHN latest-order fetch throws', async () => {
+  let triggerCalled = false;
+
+  const result = await runScheduledSync({
+    readCurrentOrders: async () => [{ order_code: 'A001', status: 'ready_to_pick', updated_date: '2026-06-17T01:00:00.000Z' }],
+    readLatestOrders: async () => {
+      throw new Error('GHN timeout');
+    },
+    triggerRebuild: async () => {
+      triggerCalled = true;
+      return { triggered: true, skipped: false, reason: null, detail: null };
+    },
+  });
+
+  assert.equal(result.syncSkipped, true);
+  assert.equal(result.syncSkipReason, 'ghn_fetch_failed');
+  assert.equal(result.syncSkipDetail, 'GHN timeout');
+  assert.equal(result.rebuildNeeded, false);
+  assert.equal(result.rebuildTriggered, false);
+  assert.equal(triggerCalled, false);
+});
+
+test('triggerBuildHook soft-fails when the build hook endpoint returns a non-200 response', async () => {
+  process.env.NETLIFY_BUILD_HOOK_URL = 'https://example.com/build-hook';
+
+  const result = await triggerBuildHook(async () => ({
+    ok: false,
+    status: 500,
+    async text() {
+      return 'Internal failure';
+    },
+  }));
+
+  assert.deepEqual(result, {
+    triggered: false,
+    skipped: true,
+    reason: 'build_hook_failed',
+    detail: 'Build hook returned HTTP 500: Internal failure',
+  });
 });

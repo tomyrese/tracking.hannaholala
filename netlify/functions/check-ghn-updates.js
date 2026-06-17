@@ -98,6 +98,7 @@ export async function triggerBuildHook(fetchImpl = fetch) {
       triggered: false,
       skipped: true,
       reason: 'missing_build_hook_url',
+      detail: null,
     };
   }
 
@@ -109,13 +110,20 @@ export async function triggerBuildHook(fetchImpl = fetch) {
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`Build hook returned HTTP ${response.status}: ${text}`);
+    console.warn(`[Scheduled Sync] Build hook failed with HTTP ${response.status}: ${text}`);
+    return {
+      triggered: false,
+      skipped: true,
+      reason: 'build_hook_failed',
+      detail: `Build hook returned HTTP ${response.status}: ${text}`,
+    };
   }
 
   return {
     triggered: true,
     skipped: false,
     reason: null,
+    detail: null,
   };
 }
 
@@ -124,19 +132,30 @@ export async function runScheduledSync({
   readLatestOrders = fetchLatestGhnOrders,
   triggerRebuild = triggerBuildHook,
 } = {}) {
-  const [currentOrders, latestResult] = await Promise.all([
-    readCurrentOrders(),
-    readLatestOrders(),
-  ]);
+  const currentOrders = await readCurrentOrders();
+
+  let latestResult;
+  try {
+    latestResult = await readLatestOrders();
+  } catch (error) {
+    console.warn('[Scheduled Sync] Skipping GHN sync because latest-order fetch failed:', error);
+    latestResult = {
+      orders: [],
+      skipped: true,
+      reason: 'ghn_fetch_failed',
+      detail: error.message,
+    };
+  }
 
   const latestOrders = Array.isArray(latestResult) ? latestResult : latestResult.orders || [];
   const syncSkipped = !Array.isArray(latestResult) && Boolean(latestResult?.skipped);
   const syncSkipReason = !Array.isArray(latestResult) ? (latestResult?.reason ?? null) : null;
+  const syncSkipDetail = !Array.isArray(latestResult) ? (latestResult?.detail ?? null) : null;
 
   const rebuildNeeded = hasMeaningfulChanges(currentOrders, latestOrders);
   const buildHook = rebuildNeeded
     ? await triggerRebuild()
-    : { triggered: false, skipped: false, reason: null };
+    : { triggered: false, skipped: false, reason: null, detail: null };
 
   return {
     checkedAt: new Date().toISOString(),
@@ -144,10 +163,12 @@ export async function runScheduledSync({
     currentCount: currentOrders.length,
     syncSkipped,
     syncSkipReason,
+    syncSkipDetail,
     rebuildNeeded,
     rebuildTriggered: buildHook.triggered,
     buildHookSkipped: buildHook.skipped,
     buildHookReason: buildHook.reason,
+    buildHookDetail: buildHook.detail ?? null,
   };
 }
 
