@@ -58,3 +58,33 @@ test('falls back to a direct line when the routing service fails', async () => {
     [10.8, 106.8],
   ]);
 });
+
+test('falls back to a direct line when OSRM returns geometry outside Vietnam', async () => {
+  const route = await fetchRoadRoute(
+    async () => ({
+      ok: true,
+      async json() {
+        return {
+          routes: [
+            {
+              geometry: {
+                coordinates: [
+                  [106.5, 10.5],
+                  [104.9, 11.4],
+                  [106.8, 10.8],
+                ],
+              },
+            },
+          ],
+        };
+      },
+    }),
+    { lat: 10.5, lng: 106.5 },
+    { lat: 10.8, lng: 106.8 },
+  );
+
+  assert.deepEqual(route, [
+    [10.5, 106.5],
+    [10.8, 106.8],
+  ]);
+});
