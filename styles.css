@@ -1037,7 +1037,7 @@ h1 {
 }
 
 .timeline__item[data-map-interactive="true"]::after {
-  content: 'Bam de xem tren ban do';
+  content: 'Bấm để xem trên bản đồ';
   display: block;
   grid-column: 2;
   margin-top: 6px;

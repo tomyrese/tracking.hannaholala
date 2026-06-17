@@ -10,6 +10,16 @@ const VIETNAM_BOUNDS = {
   maxLng: 109.7,
 };
 
+const VIETNAM_CORRIDOR = [
+  { lat: 10.9, lng: 106.7 },
+  { lat: 12.2, lng: 108.2 },
+  { lat: 14.7, lng: 108.7 },
+  { lat: 16.5, lng: 108.1 },
+  { lat: 18.3, lng: 106.8 },
+  { lat: 20.2, lng: 105.6 },
+  { lat: 21.55, lng: 103.5 },
+];
+
 function isPointInVietnam(lat, lng) {
   return (
     lat >= VIETNAM_BOUNDS.minLat &&
@@ -38,19 +48,46 @@ function routeLeavesVietnamMeaningfully(points) {
   return outsideCount >= 3 || longestOutsideRun >= 2 || outsideCount / points.length > 0.35;
 }
 
-export async function fetchRoadRoute(fetchImpl, start, end) {
-  const fallbackRoute = [
+function buildVietnamFallbackRoute(start, end) {
+  const directRoute = [
     [start.lat, start.lng],
     [end.lat, end.lng],
   ];
 
+  if (!isPointInVietnam(start.lat, start.lng) || !isPointInVietnam(end.lat, end.lng)) {
+    return directRoute;
+  }
+
+  const latSpan = Math.abs(end.lat - start.lat);
+  const lngSpan = Math.abs(end.lng - start.lng);
+  if (latSpan < 1.2 && lngSpan < 1.2) {
+    return directRoute;
+  }
+
+  const minLat = Math.min(start.lat, end.lat);
+  const maxLat = Math.max(start.lat, end.lat);
+
+  const corridorStops = VIETNAM_CORRIDOR
+    .filter((point) => point.lat > minLat + 0.25 && point.lat < maxLat - 0.25)
+    .sort((a, b) => (start.lat <= end.lat ? a.lat - b.lat : b.lat - a.lat));
+
+  return [
+    [start.lat, start.lng],
+    ...corridorStops.map((point) => [point.lat, point.lng]),
+    [end.lat, end.lng],
+  ];
+}
+
+export async function fetchRoadRoute(fetchImpl, start, end) {
   if (!start || !end) {
-    return fallbackRoute;
+    return [];
   }
 
   if (start.lat === end.lat && start.lng === end.lng) {
     return [[start.lat, start.lng]];
   }
+
+  const fallbackRoute = buildVietnamFallbackRoute(start, end);
 
   try {
     const response = await fetchImpl(buildOsrmRouteUrl([start, end]));

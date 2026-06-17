@@ -46,20 +46,20 @@ test('returns OSRM road geometry when the routing service responds successfully'
   ]);
 });
 
-test('falls back to a direct line when the routing service fails', async () => {
+test('falls back to a Vietnam-shaped route when the routing service fails for a long domestic trip', async () => {
   const route = await fetchRoadRoute(
     async () => ({ ok: false }),
-    { lat: 10.5, lng: 106.5 },
-    { lat: 10.8, lng: 106.8 },
+    { lat: 10.857213, lng: 106.7081402 },
+    { lat: 21.5927453, lng: 103.4238921 },
   );
 
-  assert.deepEqual(route, [
-    [10.5, 106.5],
-    [10.8, 106.8],
-  ]);
+  assert.equal(route.length > 2, true);
+  assert.deepEqual(route[0], [10.857213, 106.7081402]);
+  assert.deepEqual(route.at(-1), [21.5927453, 103.4238921]);
+  assert.equal(route.some(([lat, lng]) => lat > 14 && lng > 107.5), true);
 });
 
-test('falls back to a direct line when OSRM returns geometry outside Vietnam', async () => {
+test('falls back to a Vietnam-shaped route when OSRM returns geometry outside Vietnam', async () => {
   const route = await fetchRoadRoute(
     async () => ({
       ok: true,
@@ -81,14 +81,14 @@ test('falls back to a direct line when OSRM returns geometry outside Vietnam', a
         };
       },
     }),
-    { lat: 10.5, lng: 106.5 },
-    { lat: 10.8, lng: 106.8 },
+    { lat: 10.857213, lng: 106.7081402 },
+    { lat: 21.5927453, lng: 103.4238921 },
   );
 
-  assert.deepEqual(route, [
-    [10.5, 106.5],
-    [10.8, 106.8],
-  ]);
+  assert.equal(route.length > 2, true);
+  assert.deepEqual(route[0], [10.857213, 106.7081402]);
+  assert.deepEqual(route.at(-1), [21.5927453, 103.4238921]);
+  assert.equal(route.some(([lat, lng]) => lat > 14 && lng > 107.5), true);
 });
 
 test('keeps a route when only a tiny minority of points fall just outside the Vietnam polygon', async () => {
