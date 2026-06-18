@@ -39,3 +39,8 @@
   from = "/api/submit-review"
   to = "/.netlify/functions/submit-review"
   status = 200
+
+[[redirects]]
+  from = "/api/claim-discount"
+  to = "/.netlify/functions/claim-discount"
+  status = 200
