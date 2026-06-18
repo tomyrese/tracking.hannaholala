@@ -139,6 +139,8 @@ function initSlider(root, grid) {
   const btnRight = root.querySelector('[data-products-arrow-right]');
   if (!btnLeft || !btnRight) return;
 
+  let isAnimating = false;
+
   const updateArrows = () => {
     const scrollLeft = grid.scrollLeft;
     const maxScroll = grid.scrollWidth - grid.clientWidth;
@@ -147,14 +149,50 @@ function initSlider(root, grid) {
     btnRight.disabled = scrollLeft >= maxScroll - 2;
   };
 
-  btnLeft.addEventListener('click', () => {
-    // Scroll by exactly 1 item (192px including gap)
-    grid.scrollBy({ left: -192, behavior: 'smooth' });
+  const animateScroll = (direction) => {
+    if (isAnimating) return;
+    isAnimating = true;
+
+    const start = grid.scrollLeft;
+    const cardWidth = 192; // 184px width + 8px gap
+    const currentCardIndex = Math.round(start / cardWidth);
+    const targetCardIndex = currentCardIndex + direction;
+    const maxScroll = grid.scrollWidth - grid.clientWidth;
+    const target = Math.max(0, Math.min(maxScroll, targetCardIndex * cardWidth));
+
+    const change = target - start;
+    const duration = 400; // ms
+    let startTime = null;
+
+    function step(currentTime) {
+      if (!startTime) startTime = currentTime;
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+
+      // Ease out cubic easing curve
+      const ease = 1 - Math.pow(1 - progress, 3);
+      grid.scrollLeft = start + change * ease;
+
+      if (elapsed < duration) {
+        requestAnimationFrame(step);
+      } else {
+        grid.scrollLeft = target;
+        isAnimating = false;
+        updateArrows();
+      }
+    }
+
+    requestAnimationFrame(step);
+  };
+
+  btnLeft.addEventListener('click', (e) => {
+    e.preventDefault();
+    animateScroll(-1);
   });
 
-  btnRight.addEventListener('click', () => {
-    // Scroll by exactly 1 item (192px including gap)
-    grid.scrollBy({ left: 192, behavior: 'smooth' });
+  btnRight.addEventListener('click', (e) => {
+    e.preventDefault();
+    animateScroll(1);
   });
 
   grid.addEventListener('scroll', updateArrows, { passive: true });

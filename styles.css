@@ -142,12 +142,12 @@ svg {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  margin-bottom: 16px;
+  gap: 12px;
+  margin-bottom: 24px;
 }
 
 .featured-products__title {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 800;
   color: #9b6b5c;
   letter-spacing: .12em;
@@ -155,7 +155,7 @@ svg {
 }
 
 .featured-products__logo {
-  height: 24px;
+  height: 32px;
   width: auto;
   object-fit: contain;
   display: block;
