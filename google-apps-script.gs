@@ -2,10 +2,9 @@
 // Copy mã nguồn này và dán vào phần "Apps Script" (Extensions > Apps Script) của Google Sheet:
 // https://docs.google.com/spreadsheets/d/1w8GbqOL_yWtjH4XXIYPxP5gwOS2qrILy8T5Kfw6TOGI/edit
 
-// Cấu hình mã bảo mật dùng chung (Shared Secret) để tránh người ngoài gọi trực tiếp.
-// Hãy đặt mã này giống với giá trị của GOOGLE_REVIEW_SHARED_SECRET trong file .env hoặc cấu hình Netlify.
 const SHARED_SECRET = "hannah-olala-review-secret-2026";
 const SHEET_NAME = "DANHGIA";
+const DISCOUNT_SHEET_NAME = "GIAMGIA";
 
 function doGet(e) {
   const params = e.parameter || {};
@@ -33,6 +32,23 @@ function doGet(e) {
       });
     } else {
       return jsonResponse({ ok: true, reviewed: false });
+    }
+  }
+
+  // 3. Kiểm tra hành động check_discount
+  if (action === "check_discount") {
+    if (!trackingCode) {
+      return jsonResponse({ ok: false, message: "Thiếu mã đơn hàng." });
+    }
+    const discountData = checkDiscountClaimed(trackingCode);
+    if (discountData) {
+      return jsonResponse({
+        ok: true,
+        claimed: true,
+        code: discountData.code
+      });
+    } else {
+      return jsonResponse({ ok: true, claimed: false });
     }
   }
 
@@ -108,6 +124,54 @@ function doPost(e) {
     }
   }
 
+  // 3. Thực hiện ghi nhận mã giảm giá giao trễ
+  if (action === "claim_discount") {
+    const trackingCode = String(data.tracking_code || "").trim().toUpperCase();
+    const orderCode = String(data.order_code || "").trim().toUpperCase();
+    const phone = String(data.phone || "").trim();
+    const discountCode = String(data.discount_code || "").trim().toUpperCase();
+    const value = Number(data.value || 50000);
+
+    if (!trackingCode || !discountCode) {
+      return jsonResponse({ ok: false, message: "Thiếu mã đơn hàng hoặc mã giảm giá." });
+    }
+
+    // Kiểm tra trùng lặp
+    if (checkDiscountClaimed(trackingCode)) {
+      return jsonResponse({
+        ok: false,
+        claimed: true,
+        created: false,
+        message: "Đơn hàng này đã nhận mã giảm giá."
+      });
+    }
+
+    try {
+      const sheet = getOrCreateDiscountSheet();
+      const submittedAt = new Date();
+      
+      sheet.appendRow([
+        submittedAt,
+        trackingCode,
+        orderCode,
+        phone,
+        discountCode,
+        value,
+        "Đã tạo"
+      ]);
+
+      return jsonResponse({
+        ok: true,
+        claimed: true,
+        created: true,
+        code: discountCode,
+        message: "Ghi nhận mã giảm giá thành công."
+      });
+    } catch (err) {
+      return jsonResponse({ ok: false, message: "Lỗi ghi dữ liệu vào Google Sheet: " + err.message });
+    }
+  }
+
   return jsonResponse({ ok: false, message: "Hành động không hợp lệ." });
 }
 
@@ -144,6 +208,33 @@ function checkIfReviewed(trackingCode) {
   return null;
 }
 
+// Hàm kiểm tra mã đơn hàng đã nhận mã giảm giá chưa
+function checkDiscountClaimed(trackingCode) {
+  if (!trackingCode) return null;
+  const sheet = getOrCreateDiscountSheet();
+  const data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return null; // Chỉ có dòng tiêu đề
+
+  const headers = data[0].map(function(h) { return String(h).trim().toLowerCase(); });
+  const trackingCodeIdx = headers.indexOf("mã đơn hàng") !== -1 ? headers.indexOf("mã đơn hàng") : headers.indexOf("tracking_code");
+  const codeIdx = headers.indexOf("mã giảm giá") !== -1 ? headers.indexOf("mã giảm giá") : headers.indexOf("discount_code");
+
+  const colTracking = trackingCodeIdx !== -1 ? trackingCodeIdx : 1;
+  const colCode = codeIdx !== -1 ? codeIdx : 4;
+
+  const cleanCode = String(trackingCode).trim().toUpperCase();
+
+  for (let i = 1; i < data.length; i++) {
+    const cellValue = String(data[i][colTracking]).trim().toUpperCase();
+    if (cellValue === cleanCode) {
+      return {
+        code: String(data[i][colCode] || "")
+      };
+    }
+  }
+  return null;
+}
+
 // Lấy sheet DANHGIA hoặc tự động tạo nếu chưa có
 function getOrCreateSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -162,6 +253,28 @@ function getOrCreateSheet() {
     ]);
     // Format dòng tiêu đề cho đẹp mắt
     sheet.getRange("A1:G1").setFontWeight("bold").setBackground("#f4e8e1");
+  }
+  return sheet;
+}
+
+// Lấy sheet GIAMGIA hoặc tự động tạo nếu chưa có
+function getOrCreateDiscountSheet() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(DISCOUNT_SHEET_NAME);
+  if (!sheet) {
+    sheet = ss.insertSheet(DISCOUNT_SHEET_NAME);
+    // Ghi hàng tiêu đề (Headers)
+    sheet.appendRow([
+      "Thời gian",
+      "Mã đơn hàng",
+      "Mã vận đơn (GHN)",
+      "Số điện thoại",
+      "Mã giảm giá",
+      "Trị giá",
+      "Trạng thái"
+    ]);
+    // Format dòng tiêu đề cho đẹp mắt
+    sheet.getRange("A1:G1").setFontWeight("bold").setBackground("#e2f0d9");
   }
   return sheet;
 }

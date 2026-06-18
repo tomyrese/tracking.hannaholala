@@ -33,6 +33,33 @@ export function isDeliveredReviewableResult(result) {
   );
 }
 
+export function isOrderDelayed(result) {
+  if (!result?.ok || result?.type !== 'live') return false;
+
+  const rawOrder = result.raw?.data || {};
+  const leadtimeStr = rawOrder.leadtime || rawOrder.expected_delivery_time;
+  if (!leadtimeStr) return false;
+
+  const leadtimeDate = new Date(leadtimeStr);
+  if (isNaN(leadtimeDate.getTime())) return false;
+
+  const now = new Date();
+  const isTimePassed = now > leadtimeDate;
+
+  const status = normalizeText(rawOrder.status || result.status || '');
+  const isExcludedStatus = 
+    status.includes('delivered') || 
+    status.includes('giao thanh cong') ||
+    status.includes('cancel') || 
+    status.includes('huy') ||
+    status.includes('return') || 
+    status.includes('tra hang') ||
+    status.includes('returned') ||
+    status.includes('returning');
+
+  return isTimePassed && !isExcludedStatus;
+}
+
 export function extractReviewIdentity(result) {
   return {
     trackingCode: normalizeReviewCode(result?.clientOrderCode || result?.code),

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { trackShipment } from './src/trackingApi.mjs';
 import { generateSvgCaptcha, validateCaptcha } from './src/captcha.mjs';
 import { handleReviewRequest } from './src/reviewHandler.mjs';
+import { handleDiscountRequest } from './src/discountHandler.mjs';
 import { syncGhnOrders } from './src/sync.mjs';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
@@ -108,6 +109,28 @@ async function handleApi(request, response, url) {
 
     response.writeHead(reviewResponse.statusCode, reviewResponse.headers);
     response.end(reviewResponse.body);
+    return;
+  }
+
+  if (url.pathname === '/api/claim-discount') {
+    const body = request.method === 'POST'
+      ? await new Promise((resolve, reject) => {
+          const chunks = [];
+          request.on('data', (chunk) => chunks.push(chunk));
+          request.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+          request.on('error', reject);
+        })
+      : '';
+
+    const discountResponse = await handleDiscountRequest({
+      method: request.method,
+      query: Object.fromEntries(url.searchParams.entries()),
+      body,
+      env: process.env,
+    });
+
+    response.writeHead(discountResponse.statusCode, discountResponse.headers);
+    response.end(discountResponse.body);
     return;
   }
 

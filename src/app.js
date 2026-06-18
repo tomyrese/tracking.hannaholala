@@ -4,7 +4,7 @@ import { buildRoute, VIETNAM_MAP_BOUNDS } from './mapRoute.mjs';
 import { createTrackingRouteManager } from './TrackingRouteManager.mjs';
 import { buildMarkerDisplayState, buildViewportFocusPoints } from './mapViewport.mjs';
 import { mountFeaturedProducts } from './components/featured-products.js';
-import { isDeliveredReviewableResult } from './reviewGateway.mjs';
+import { isDeliveredReviewableResult, isOrderDelayed } from './reviewGateway.mjs';
 
 const icons = {
   check: '<path d="M20 6 9 17l-5-5"></path>',
@@ -27,6 +27,7 @@ const helperText = document.querySelector('[data-helper-text]');
 const trackButton = document.querySelector('.track-button');
 const backBtnContainer = document.querySelector('[data-back-btn-container]');
 const reviewPanel = document.querySelector('[data-review-panel]');
+const discountPanel = document.querySelector('[data-discount-panel]');
 
 let lastPhoneSearchResult = null;
 let activeResultCode = '';
@@ -413,6 +414,42 @@ async function renderApiResult(result) {
         </div>
       `;
     }
+  } else {
+    if (reviewPanel) reviewPanel.hidden = true;
+  }
+
+  if (isLive && isOrderDelayed(preparedResult) && discountPanel) {
+    const trackingCode = preparedResult.clientOrderCode || preparedResult.code;
+    const checkUrl = new URL('/api/claim-discount', apiBaseUrl());
+    checkUrl.searchParams.set('code', trackingCode);
+    
+    discountPanel.hidden = false;
+    discountPanel.innerHTML = `
+      <div class="review-panel__card">
+        <h3>Quà tặng giao trễ</h3>
+        <p>Đang kiểm tra trạng thái quà tặng...</p>
+      </div>
+    `;
+    
+    try {
+      const res = await fetch(checkUrl);
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        renderDiscountPanel(preparedResult, data);
+      } else {
+        discountPanel.hidden = true;
+      }
+    } catch (err) {
+      console.error('Error checking discount status:', err);
+      discountPanel.innerHTML = `
+        <div class="review-panel__card">
+          <h3>Quà tặng giao trễ</h3>
+          <p class="review-panel__message review-panel__message--error">Không thể kiểm tra trạng thái quà tặng.</p>
+        </div>
+      `;
+    }
+  } else {
+    if (discountPanel) discountPanel.hidden = true;
   }
 }
 
@@ -446,6 +483,83 @@ function renderReviewForm(preparedResult, reviewData) {
       e.preventDefault();
       openReviewModal(preparedResult, reviewData);
     });
+  }
+}
+
+function renderDiscountPanel(preparedResult, discountData) {
+  if (!discountPanel) return;
+
+  const trackingCode = discountData.trackingCode || preparedResult.clientOrderCode || preparedResult.code;
+
+  if (discountData.claimed) {
+    discountPanel.innerHTML = `
+      <div class="review-panel__card" style="text-align: center; display: grid; justify-items: center; gap: 8px; border: 1px solid #c2e0b4; background: #f2f9f1;">
+        <h3 style="font-size: 15px; margin: 0; color: #385723;">Quà tặng giao trễ từ Hannah Olala</h3>
+        <p style="margin: 0; color: #548235; font-size: 12px;">Thành thật xin lỗi vì đơn hàng giao trễ hơn dự kiến. Đây là mã giảm giá 50.000đ dành riêng cho bạn:</p>
+        <div style="display: flex; gap: 8px; align-items: center; margin-top: 6px;">
+          <strong id="discount-code-val" style="font-size: 16px; background: #ffffff; border: 2px dashed #a9d18e; padding: 6px 12px; border-radius: 8px; color: #385723; letter-spacing: 1px;">${discountData.code}</strong>
+          <button id="btn-copy-discount" class="track-button" style="min-height: 34px; padding: 0 12px; font-size: 11px; border-radius: 8px; background: var(--beige); color: #6f554b; border: 1px solid #efd2c8;">Sao chép</button>
+        </div>
+        <span id="copy-success-msg" style="font-size: 11px; color: #385723; font-weight: 600; display: none;">Đã sao chép mã thành công!</span>
+      </div>
+    `;
+
+    const copyBtn = discountPanel.querySelector('#btn-copy-discount');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', () => {
+        navigator.clipboard.writeText(discountData.code);
+        const msg = discountPanel.querySelector('#copy-success-msg');
+        if (msg) {
+          msg.style.display = 'inline';
+          setTimeout(() => { msg.style.display = 'none'; }, 2000);
+        }
+      });
+    }
+  } else {
+    discountPanel.innerHTML = `
+      <div class="review-panel__card" style="text-align: center; display: grid; justify-items: center; gap: 8px;">
+        <h3 style="font-size: 15px; margin: 0;">Quà tặng giao trễ từ Hannah Olala</h3>
+        <p style="margin: 0; color: var(--muted); font-size: 12px;">Đơn hàng của bạn bị giao trễ hơn so với thời gian dự kiến. Hãy nhận một mã giảm giá 50.000đ làm quà xin lỗi nhé!</p>
+        <button id="btn-claim-discount" class="track-button" style="min-height: 38px; padding: 0 16px; font-size: 12px; margin-top: 4px; background: var(--rose); color: var(--white);">Nhận mã giảm giá</button>
+      </div>
+    `;
+
+    const claimBtn = discountPanel.querySelector('#btn-claim-discount');
+    if (claimBtn) {
+      claimBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        claimBtn.disabled = true;
+        claimBtn.textContent = 'Đang nhận mã...';
+        
+        try {
+          const claimUrl = new URL('/api/claim-discount', apiBaseUrl());
+          const response = await fetch(claimUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              trackingCode: trackingCode
+            }),
+          });
+          const resData = await response.json();
+          if (response.ok && resData.ok) {
+            discountData.claimed = true;
+            discountData.code = resData.code;
+            renderDiscountPanel(preparedResult, discountData);
+          } else {
+            alert(resData.message || 'Có lỗi xảy ra khi nhận mã giảm giá.');
+            claimBtn.disabled = false;
+            claimBtn.textContent = 'Nhận mã giảm giá';
+          }
+        } catch (err) {
+          console.error('Claim discount error:', err);
+          alert('Không thể kết nối tới máy chủ.');
+          claimBtn.disabled = false;
+          claimBtn.textContent = 'Nhận mã giảm giá';
+        }
+      });
+    }
   }
 }
 
