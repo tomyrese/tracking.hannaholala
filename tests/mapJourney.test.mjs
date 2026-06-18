@@ -19,15 +19,12 @@ test('buildMapJourney keeps origin and destination fixed while current follows t
 
   assert.deepEqual(journey.origin, { lat: 10.1, lng: 106.1 });
   assert.deepEqual(journey.destination, { lat: 10.9, lng: 106.9 });
-  assert.deepEqual(journey.current, { lat: 10.8, lng: 106.8 });
+  assert.deepEqual(journey.current, { lat: 10.1, lng: 106.1 });
   assert.equal(journey.currentCheckpoint.title, 'Dang giao');
   assert.equal(journey.checkpoints.length, 3);
-  assert.equal(journey.pathPoints[0].kind, 'origin');
-  assert.equal(journey.pathPoints.at(-1).kind, 'destination');
-  assert.equal(journey.routePaths.full.length > journey.pathPoints.length, true);
 });
 
-test('route manager creates virtual points so text-only interactive steps stay clickable', () => {
+test('timeline steps do not invent point coordinates before a real route geometry is assigned', () => {
   const manager = createTrackingRouteManager({
     from_location: { lat: 10.1, long: 106.1 },
     to_location: { lat: 10.9, long: 106.9 },
@@ -40,9 +37,7 @@ test('route manager creates virtual points so text-only interactive steps stay c
   });
 
   const timelineSteps = manager.syncTimeline(manager.activeStepIndex);
-  assert.equal(timelineSteps.length >= 3, true);
-  assert.equal(timelineSteps.every((step) => step.point && Number.isFinite(step.point.lat) && Number.isFinite(step.point.lng)), true);
-  assert.equal(timelineSteps.some((step) => step.isVirtual), true);
+  assert.equal(timelineSteps.every((step) => step.point === null), true);
 });
 
 test('route manager keeps only one delivered step even if source data repeats it', () => {
@@ -60,43 +55,55 @@ test('route manager keeps only one delivered step even if source data repeats it
   assert.equal(deliveredSteps.length, 1);
 });
 
-test('completed and remaining paths are both preserved instead of removing the old route', () => {
+test('setRouteGeometry samples every timeline step directly from the route coordinates', () => {
   const manager = createTrackingRouteManager({
     from_location: { lat: 10.1, long: 106.1 },
     to_location: { lat: 10.9, long: 106.9 },
     events: [
-      { title: 'Du kien giao hang', lat: 10.7, lng: 106.7 },
-      { title: 'Dang giao', lat: 10.6, lng: 106.6 },
-      { title: 'Da lay hang', lat: 10.2, lng: 106.2 },
+      { title: 'Giao thanh cong' },
+      { title: 'Du kien giao hang' },
+      { title: 'Dang giao' },
+      { title: 'Dang luan chuyen' },
+      { title: 'Da lay hang' },
       { title: 'Khoi tao don hang' },
     ],
   });
 
-  const pathState = manager.updateCompletedPath(1);
-  assert.equal(pathState.full.length >= 4, true);
-  assert.equal(pathState.completed.length >= 2, true);
-  assert.equal(pathState.remaining.length >= 2, true);
+  const routeGeometry = Array.from({ length: 101 }, (_, index) => ({
+    lat: 10 + (index * 0.01),
+    lng: 106 + (index * 0.005),
+  }));
+
+  manager.setRouteGeometry(routeGeometry);
+
+  const expectedIndexes = [0, 20, 40, 60, 80, 100];
+  manager.stepsChronological.forEach((step, index) => {
+    assert.equal(step.routeIndex, expectedIndexes[index]);
+    assert.deepEqual(step.point, routeGeometry[expectedIndexes[index]]);
+  });
 });
 
-test('route manager generates a curved corridor route instead of a single straight segment', () => {
+test('completed and remaining paths are always slices of the main route geometry', () => {
   const manager = createTrackingRouteManager({
     from_location: { lat: 10.1, long: 106.1 },
     to_location: { lat: 10.9, long: 106.9 },
     events: [
-      { title: 'Dang giao', lat: 10.7, lng: 106.7 },
-      { title: 'Da lay hang', lat: 10.2, lng: 106.2 },
+      { title: 'Du kien giao hang' },
+      { title: 'Dang giao' },
+      { title: 'Da lay hang' },
+      { title: 'Khoi tao don hang' },
     ],
-  }, {
-    routeVariantSeed: 'stable-test-seed',
   });
 
-  const anchors = manager.model.routePoints.map((entry) => entry.point);
-  const routeGeometry = manager.model.routeGeometry;
-  assert.equal(routeGeometry.length > anchors.length, true);
-  const midpoint = routeGeometry[Math.floor(routeGeometry.length / 2)];
-  const straightMidpoint = {
-    lat: (manager.model.origin.lat + manager.model.destination.lat) / 2,
-    lng: (manager.model.origin.lng + manager.model.destination.lng) / 2,
-  };
-  assert.notDeepEqual(midpoint, straightMidpoint);
+  const routeGeometry = Array.from({ length: 41 }, (_, index) => ({
+    lat: 10 + (index * 0.02),
+    lng: 106 + (index * 0.01),
+  }));
+  manager.setRouteGeometry(routeGeometry);
+
+  const pathState = manager.updateCompletedPath(1);
+  assert.deepEqual(pathState.full[0], [routeGeometry[0].lat, routeGeometry[0].lng]);
+  assert.deepEqual(pathState.full.at(-1), [routeGeometry.at(-1).lat, routeGeometry.at(-1).lng]);
+  assert.equal(pathState.completed.every(([lat, lng]) => routeGeometry.some((point) => point.lat === lat && point.lng === lng)), true);
+  assert.equal(pathState.remaining.every(([lat, lng]) => routeGeometry.some((point) => point.lat === lat && point.lng === lng)), true);
 });

@@ -19,7 +19,7 @@ test('map render uses emoji markers and the new tracking route manager', () => {
 test('route manager exposes route generation, virtual points, marker states, and timeline sync helpers', () => {
   assert.match(routeManagerSource, /class TrackingRouteManager/);
   assert.match(routeManagerSource, /generateRoutePoints\(\)/);
-  assert.match(routeManagerSource, /generateVirtualPoints\(/);
+  assert.match(routeManagerSource, /buildTimelinePoints\(/);
   assert.match(routeManagerSource, /moveVehicleToStep\(/);
   assert.match(routeManagerSource, /updateCompletedPath\(/);
   assert.match(routeManagerSource, /updateMarkerStates\(/);

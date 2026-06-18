@@ -40,54 +40,11 @@ function normalizeText(value) {
     .trim();
 }
 
-function interpolatePoint(from, to, ratio) {
-  return {
-    lat: from.lat + ((to.lat - from.lat) * ratio),
-    lng: from.lng + ((to.lng - from.lng) * ratio),
-  };
-}
-
-function distanceBetween(a, b) {
-  if (!a || !b) return 0;
-  const deltaLat = b.lat - a.lat;
-  const deltaLng = b.lng - a.lng;
-  return Math.sqrt((deltaLat ** 2) + (deltaLng ** 2));
-}
-
 function distanceSquared(a, b) {
   if (!a || !b) return Infinity;
   const deltaLat = b.lat - a.lat;
   const deltaLng = b.lng - a.lng;
   return (deltaLat ** 2) + (deltaLng ** 2);
-}
-
-function quadraticBezier(start, control, end, t) {
-  const inverse = 1 - t;
-  return {
-    lat: (inverse * inverse * start.lat) + (2 * inverse * t * control.lat) + (t * t * end.lat),
-    lng: (inverse * inverse * start.lng) + (2 * inverse * t * control.lng) + (t * t * end.lng),
-  };
-}
-
-function hashSeed(value) {
-  const text = String(value || 'tracking-route');
-  let hash = 1779033703 ^ text.length;
-  for (let index = 0; index < text.length; index += 1) {
-    hash = Math.imul(hash ^ text.charCodeAt(index), 3432918353);
-    hash = (hash << 13) | (hash >>> 19);
-  }
-  return hash >>> 0;
-}
-
-function createRng(seedValue) {
-  let state = hashSeed(seedValue) || 1;
-  return () => {
-    state += 0x6D2B79F5;
-    let temp = state;
-    temp = Math.imul(temp ^ (temp >>> 15), temp | 1);
-    temp ^= temp + Math.imul(temp ^ (temp >>> 7), temp | 61);
-    return ((temp ^ (temp >>> 14)) >>> 0) / 4294967296;
-  };
 }
 
 function classifyTrackingEvent(event, index) {
@@ -152,8 +109,6 @@ export class TrackingRouteManager {
     this.result = result || {};
     this.fallbackOrigin = options.fallbackOrigin || { lat: 21.0285, lng: 105.8542 };
     this.fallbackDestination = options.fallbackDestination || { lat: 10.8231, lng: 106.6297 };
-    this.routeVariantSeed = options.routeVariantSeed || `${this.result?.clientOrderCode || this.result?.order_code || this.result?.code || 'tracking'}-${Date.now()}`;
-    this.rng = createRng(this.routeVariantSeed);
     this.activeStepIndex = 0;
     this.model = this.generateRoutePoints();
   }
@@ -197,18 +152,16 @@ export class TrackingRouteManager {
     this.originPoint = clonePoint(originPoint);
     this.destinationPoint = clonePoint(destinationPoint);
 
-    const virtualizedSteps = this.generateVirtualPoints(stepsChronological);
-    const routeAnchors = this.generateAnchorPoints(virtualizedSteps);
-    const visualRoute = this.generateVisualRoute(routeAnchors);
+    const routeAnchors = this.generateAnchorPoints(stepsChronological);
     this.routeAnchors = routeAnchors;
 
-    this.stepsChronological = virtualizedSteps;
-    this.timelineSteps = [...virtualizedSteps].sort((a, b) => b.stepIndex - a.stepIndex);
-    this.activeStepIndex = virtualizedSteps.length ? virtualizedSteps.length - 1 : 0;
+    this.stepsChronological = stepsChronological.map((step) => ({ ...step, point: null, routeIndex: null, isRoutePoint: false }));
+    this.timelineSteps = [...this.stepsChronological].sort((a, b) => b.stepIndex - a.stepIndex);
+    this.activeStepIndex = this.stepsChronological.length ? this.stepsChronological.length - 1 : 0;
 
-    const latestStep = virtualizedSteps.at(-1) || null;
+    const latestStep = this.stepsChronological.at(-1) || null;
     const delivered = latestStep?.phase === 'delivered';
-    const currentPoint = latestStep?.point || originPoint;
+    const currentPoint = delivered ? destinationPoint : originPoint;
 
     return {
       origin: clonePoint(originPoint),
@@ -217,12 +170,12 @@ export class TrackingRouteManager {
       currentTitle: latestStep?.title || 'Vi tri xe hien tai',
       currentCheckpoint: latestStep,
       routePoints: routeAnchors,
-      routeGeometry: visualRoute.points,
-      routeGeometryByStep: visualRoute.routeIndexByStep,
-      originRouteIndex: visualRoute.originRouteIndex,
-      destinationRouteIndex: visualRoute.destinationRouteIndex,
+      routeGeometry: [clonePoint(originPoint), clonePoint(destinationPoint)],
+      routeGeometryByStep: new Map(),
+      originRouteIndex: 0,
+      destinationRouteIndex: 1,
       checkpoints: this.timelineSteps,
-      stepsChronological: virtualizedSteps,
+      stepsChronological: this.stepsChronological,
       isDelivered: delivered,
       isCollapsed: pointsEqual(currentPoint, destinationPoint),
       isNearDestination: this.isNearPoint(currentPoint, destinationPoint),
@@ -240,18 +193,7 @@ export class TrackingRouteManager {
 
     if (normalizedPoints.length < 2) return;
 
-    const routeIndexByStep = new Map();
-    if (this.routeAnchors?.length) {
-      for (const anchor of this.routeAnchors) {
-        const nearestIndex = this.findNearestRouteIndex(normalizedPoints, anchor.point);
-        if (anchor.kind === 'step') {
-          routeIndexByStep.set(anchor.stepIndex, nearestIndex);
-        }
-        if (anchor.kind === 'destination') {
-          routeIndexByStep.set('destination', nearestIndex);
-        }
-      }
-    }
+    const routeIndexByStep = this.buildTimelinePoints(normalizedPoints, this.stepsChronological.length);
 
     this.model = {
       ...this.model,
@@ -259,55 +201,22 @@ export class TrackingRouteManager {
       routeGeometryByStep: routeIndexByStep,
       originRouteIndex: 0,
       destinationRouteIndex: normalizedPoints.length - 1,
+      current: this.getRoutePoint(routeIndexByStep.get(this.activeStepIndex) ?? normalizedPoints.length - 1),
     };
-  }
 
-  findNearestRouteIndex(routePoints, point) {
-    let bestIndex = 0;
-    let bestDistance = Infinity;
-
-    routePoints.forEach((candidate, index) => {
-      const currentDistance = distanceSquared(candidate, point);
-      if (currentDistance < bestDistance) {
-        bestDistance = currentDistance;
-        bestIndex = index;
-      }
+    this.stepsChronological = this.stepsChronological.map((step) => {
+      const routeIndex = routeIndexByStep.get(step.stepIndex) ?? 0;
+      return {
+        ...step,
+        routeIndex,
+        point: clonePoint(normalizedPoints[routeIndex]),
+        isRoutePoint: true,
+      };
     });
-
-    return bestIndex;
-  }
-
-  generateVirtualPoints(steps) {
-    if (!steps.length) return [];
-
-    const filled = steps.map((step) => ({ ...step, point: step.point ? clonePoint(step.point) : null }));
-
-    for (let index = 0; index < filled.length; index += 1) {
-      if (filled[index].point) continue;
-
-      let prevKnownIndex = index - 1;
-      while (prevKnownIndex >= 0 && !filled[prevKnownIndex].point) prevKnownIndex -= 1;
-
-      let nextKnownIndex = index + 1;
-      while (nextKnownIndex < filled.length && !filled[nextKnownIndex].point) nextKnownIndex += 1;
-
-      const fromPoint = prevKnownIndex >= 0 ? filled[prevKnownIndex].point : this.originPoint;
-      const toPoint = nextKnownIndex < filled.length ? filled[nextKnownIndex].point : this.destinationPoint;
-      const gapStart = prevKnownIndex + 1;
-      const gapEnd = nextKnownIndex - 1;
-      const gapLength = gapEnd - gapStart + 1;
-
-      for (let gapOffset = 0; gapOffset < gapLength; gapOffset += 1) {
-        const ratio = (gapOffset + 1) / (gapLength + 1);
-        const targetIndex = gapStart + gapOffset;
-        filled[targetIndex].point = interpolatePoint(fromPoint, toPoint, ratio);
-        filled[targetIndex].isVirtual = true;
-      }
-
-      index = gapEnd;
-    }
-
-    return filled;
+    this.timelineSteps = [...this.stepsChronological].sort((a, b) => b.stepIndex - a.stepIndex);
+    this.model.currentCheckpoint = this.stepsChronological[this.activeStepIndex] || null;
+    this.model.checkpoints = this.timelineSteps;
+    this.model.stepsChronological = this.stepsChronological;
   }
 
   generateAnchorPoints(steps) {
@@ -315,72 +224,37 @@ export class TrackingRouteManager {
       { kind: 'origin', point: clonePoint(this.originPoint), stepIndex: -1 },
       ...steps.map((step) => ({
         kind: 'step',
-        point: clonePoint(step.point),
+        point: step.point ? clonePoint(step.point) : null,
         stepIndex: step.stepIndex,
         phase: step.phase,
       })),
       { kind: 'destination', point: clonePoint(this.destinationPoint), stepIndex: steps.length },
     ];
 
-    return anchors.filter((anchor, index, list) => index === 0 || !pointsEqual(anchor.point, list[index - 1].point));
+    return anchors.filter((anchor, index, list) => {
+      if (!anchor.point && anchor.kind === 'step') return false;
+      return index === 0 || !pointsEqual(anchor.point, list[index - 1].point);
+    });
   }
 
-  generateVisualRoute(anchors) {
-    if (!anchors.length) {
-      return {
-        points: [],
-        routeIndexByStep: new Map(),
-        originRouteIndex: 0,
-        destinationRouteIndex: 0,
-      };
+  buildTimelinePoints(routeCoords, totalSteps) {
+    const result = new Map();
+    if (!Array.isArray(routeCoords) || routeCoords.length < 2 || totalSteps <= 0) {
+      return result;
     }
 
-    const points = [clonePoint(anchors[0].point)];
-    const routeIndexByStep = new Map();
-    routeIndexByStep.set(-1, 0);
-
-    for (let index = 0; index < anchors.length - 1; index += 1) {
-      const current = anchors[index];
-      const next = anchors[index + 1];
-      const segmentDistance = Math.max(distanceBetween(current.point, next.point), 0.0001);
-      const midpoint = interpolatePoint(current.point, next.point, 0.5);
-      const deltaLat = next.point.lat - current.point.lat;
-      const deltaLng = next.point.lng - current.point.lng;
-      const segmentLength = Math.sqrt((deltaLat ** 2) + (deltaLng ** 2)) || 1;
-      const perpendicular = { lat: -deltaLng / segmentLength, lng: deltaLat / segmentLength };
-      const along = { lat: deltaLat / segmentLength, lng: deltaLng / segmentLength };
-      const direction = this.rng() > 0.5 ? 1 : -1;
-      const amplitude = Math.min(Math.max(segmentDistance * (0.18 + (this.rng() * 0.08)), 0.00085), 0.0085);
-      const drift = (this.rng() - 0.5) * segmentDistance * 0.25;
-      const controlPoint = {
-        lat: midpoint.lat + (perpendicular.lat * amplitude * direction) + (along.lat * drift),
-        lng: midpoint.lng + (perpendicular.lng * amplitude * direction) + (along.lng * drift),
-      };
-      const sampleCount = Math.max(8, Math.min(20, Math.round(segmentDistance / 0.008)));
-
-      for (let sampleIndex = 1; sampleIndex <= sampleCount; sampleIndex += 1) {
-        const t = sampleIndex / sampleCount;
-        const point = quadraticBezier(current.point, controlPoint, next.point, t);
-        const last = points[points.length - 1];
-        if (!pointsEqual(last, point)) {
-          points.push(point);
-        }
-      }
-
-      if (next.kind === 'step') {
-        routeIndexByStep.set(next.stepIndex, points.length - 1);
-      }
-      if (next.kind === 'destination') {
-        routeIndexByStep.set('destination', points.length - 1);
-      }
+    if (totalSteps === 1) {
+      result.set(0, routeCoords.length - 1);
+      return result;
     }
 
-    return {
-      points,
-      routeIndexByStep,
-      originRouteIndex: 0,
-      destinationRouteIndex: points.length - 1,
-    };
+    for (let index = 0; index < totalSteps; index += 1) {
+      const ratio = index / (totalSteps - 1);
+      const routeIndex = Math.round(ratio * (routeCoords.length - 1));
+      result.set(index, routeIndex);
+    }
+
+    return result;
   }
 
   getRouteIndexForStep(stepIndex = this.activeStepIndex) {

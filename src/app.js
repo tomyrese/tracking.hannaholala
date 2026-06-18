@@ -115,10 +115,24 @@ function prepareVisibleTimelineEvents(result) {
     title: step.title,
     time: step.time,
     detail: step.detail,
-    lat: step.point?.lat,
-    lng: step.point?.lng,
+    lat: null,
+    lng: null,
     timelineIndex: index,
-    isVirtual: Boolean(step.isVirtual),
+    isRoutePoint: false,
+    isCurrent: Boolean(step.isCurrent),
+    timelineState: step.timelineState,
+  }));
+}
+
+function timelineEventsFromManager(manager) {
+  return manager.syncTimeline(manager.activeStepIndex).map((step, index) => ({
+    title: step.title,
+    time: step.time,
+    detail: step.detail,
+    lat: step.point?.lat ?? null,
+    lng: step.point?.lng ?? null,
+    timelineIndex: index,
+    isRoutePoint: Boolean(step.isRoutePoint),
     isCurrent: Boolean(step.isCurrent),
     timelineState: step.timelineState,
   }));
@@ -341,8 +355,16 @@ async function renderApiResult(result) {
     });
   }
 
-  renderTimelineFromEvents(preparedResult.events, carrier);
   await renderRoadJourneyMap(preparedResult);
+  const routeTimelineEvents = isLive && currentRouteModel?.manager
+    ? timelineEventsFromManager(currentRouteModel.manager)
+    : preparedResult.events;
+  renderTimelineFromEvents(routeTimelineEvents, carrier);
+
+  if (isLive && currentRouteModel?.timelineSteps?.length) {
+    bindTimelineMapFocus();
+    applyRouteFocus(currentRouteModel, 0);
+  }
 
   const cleanMsg = cleanErrorMessage(preparedResult.message);
   helperText.innerHTML = isLive
