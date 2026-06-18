@@ -510,6 +510,48 @@ async function searchOrdersByPhone(phone) {
 }
 
 export async function trackShipment(rawCode) {
+  const cleanCode = String(rawCode || '').trim().toUpperCase();
+  if (cleanCode === 'HOTESTDELAY') {
+    return {
+      ok: true,
+      type: 'live',
+      source: 'Mock Test Delay Order',
+      carrier: { id: 'ghn', name: 'Giao Hàng Nhanh', shortName: 'GHN' },
+      code: 'HOTESTDELAY',
+      clientOrderCode: 'HOTESTDELAY',
+      status: 'Đang giao hàng',
+      message: 'Dự kiến giao: 12:00 01/06/2026',
+      from_location: { lat: 21.0285, lng: 105.8542 },
+      to_location: { lat: 10.8231, lng: 106.6297 },
+      events: [
+        {
+          title: 'Chờ lấy hàng',
+          time: '09:00 30/05/2026',
+          detail: 'Đã nhận yêu cầu giao hàng',
+          lat: 21.0285,
+          lng: 105.8542
+        },
+        {
+          title: 'Dự kiến giao hàng',
+          time: '12:00 01/06/2026',
+          detail: 'Thời gian giao hàng dự kiến tới người nhận.',
+          lat: 10.8231,
+          lng: 106.6297
+        }
+      ],
+      raw: {
+        data: {
+          status: 'delivering',
+          leadtime: '2026-06-01T12:00:00Z',
+          order_code: 'HOTESTDELAY',
+          client_order_code: 'HOTESTDELAY',
+          to_phone: '0987654321',
+          from_phone: '0123456789'
+        }
+      }
+    };
+  }
+
   const carrier = detectCarrier(rawCode);
   const code = carrier.code;
 
