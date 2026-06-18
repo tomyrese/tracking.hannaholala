@@ -88,7 +88,7 @@ function classifyTrackingEvent(event, index) {
   if (text.includes('dang lay hang')) {
     return { phase: 'picking_up', rank: 20, label: 'Dang lay hang', interactive: true };
   }
-  if (text.includes('khoi tao don hang') || text.includes('tao don hang')) {
+  if (text.includes('khoi tao don hang') || text.includes('tao don hang') || text.includes('cho lay hang') || text.includes('ready to pick') || text.includes('ready_to_pick')) {
     return { phase: 'order_created', rank: 10, label: 'Khoi tao don hang', interactive: true };
   }
   if (text.includes('goi hen')) {
@@ -221,7 +221,15 @@ export class TrackingRouteManager {
 
     this.stepsChronological = stepsChronological.map((step) => ({ ...step, point: null, routeIndex: null, isRoutePoint: false }));
     this.timelineSteps = [...this.stepsChronological].sort((a, b) => b.stepIndex - a.stepIndex);
-    this.activeStepIndex = this.stepsChronological.length ? this.stepsChronological.length - 1 : 0;
+    let activeIdx = this.stepsChronological.length - 1;
+    for (let i = this.stepsChronological.length - 1; i >= 0; i--) {
+      const step = this.stepsChronological[i];
+      if (step.time && step.phase !== 'expected_delivery') {
+        activeIdx = i;
+        break;
+      }
+    }
+    this.activeStepIndex = activeIdx;
 
     const latestStep = this.stepsChronological.at(-1) || null;
     const delivered = latestStep?.phase === 'delivered';

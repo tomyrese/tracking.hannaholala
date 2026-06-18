@@ -67,7 +67,7 @@ test('buildTimeline compresses many GHN raw statuses into one event per shipping
   });
 
   const normalizedTitles = events.map((event) => normalizeText(event.title));
-  assert.equal(normalizedTitles.filter((title) => title.includes('lay hang')).length, 1);
+  assert.equal(normalizedTitles.filter((title) => title === 'da lay hang').length, 1);
   assert.equal(normalizedTitles.filter((title) => title.includes('luan chuyen')).length, 1);
   assert.equal(normalizedTitles.filter((title) => title.includes('dang giao')).length, 1);
 });
@@ -107,4 +107,45 @@ test('buildTimeline keeps only the return flow once the order has entered return
   const normalizedTitles = events.map((event) => normalizeText(event.title));
   assert.equal(normalizedTitles.some((title) => title.includes('du kien giao hang')), false);
   assert.equal(normalizedTitles.filter((title) => title.includes('tra')).length, 1);
+});
+
+test('buildTimelineForDisplay injects virtual placeholders for missing milestones on a fresh order', () => {
+  const events = buildTimelineForDisplay({
+    status: 'ready_to_pick',
+    updated_date: '2026-06-18T10:00:00.000Z',
+    leadtime: '2026-06-18T18:00:00.000Z',
+  });
+
+  assert.equal(events.length, 5);
+
+  const titles = events.map(e => e.title);
+  assert.deepEqual(titles, [
+    'Dự kiến giao hàng',
+    'Đang giao',
+    'Đang luân chuyển',
+    'Đã lấy hàng',
+    'Chờ lấy hàng',
+  ]);
+
+  // Check that the ready step has the correct time
+  const readyStep = events.find(e => e.title === 'Chờ lấy hàng');
+  assert.ok(readyStep.time);
+
+  // Check that the intermediate placeholder steps have empty times/details
+  const pickedStep = events.find(e => e.title === 'Đã lấy hàng');
+  assert.equal(pickedStep.time, '');
+  assert.equal(pickedStep.detail, '');
+
+  const transportingStep = events.find(e => e.title === 'Đang luân chuyển');
+  assert.equal(transportingStep.time, '');
+  assert.equal(transportingStep.detail, '');
+
+  const deliveringStep = events.find(e => e.title === 'Đang giao');
+  assert.equal(deliveringStep.time, '');
+  assert.equal(deliveringStep.detail, '');
+
+  // Check that the leadtime step has the correct expected delivery details
+  const leadtimeStep = events.find(e => e.title === 'Dự kiến giao hàng');
+  assert.ok(leadtimeStep.time);
+  assert.equal(leadtimeStep.detail, 'Thời gian giao hàng dự kiến tới người nhận.');
 });

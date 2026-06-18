@@ -198,6 +198,182 @@ function buildTimeline(order) {
     });
 }
 
+function normalizeVietnameseText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/[đĐ]/gu, 'd')
+    .toLowerCase()
+    .trim();
+}
+
+function isNoiseTimelineTitle(title) {
+  const text = normalizeVietnameseText(title);
+  const raw = String(title || '').toLowerCase();
+  return (
+    text.includes('khoi tao don hang') ||
+    text.includes('goi hen') ||
+    text.includes('goi khach') ||
+    text.includes('call') ||
+    text.includes('sms') ||
+    raw.includes('khởi tạo') ||
+    raw.includes('gọi')
+  );
+}
+
+function buildEventFamily(title) {
+  const text = normalizeVietnameseText(title);
+
+  if (text.includes('giao thanh cong') || text.includes('giao hang thanh cong') || text.includes('delivered')) return 'delivered';
+  if (
+    text.includes('hoan tra') ||
+    text.includes('dang tra') ||
+    text.includes('cho tra hang') ||
+    text.includes('tra hang') ||
+    text.includes('da tra') ||
+    text.includes('returned')
+  ) return 'returned';
+  if (text.includes('giao that bai') || text.includes('delivery fail')) return 'delivery_fail';
+  if (text.includes('du kien giao hang')) return 'leadtime';
+  if (
+    text.includes('dang giao') ||
+    text.includes('dang giao (thu tien)') ||
+    text.includes('giao hang (thu tien)') ||
+    text.includes('delivering')
+  ) return 'delivering';
+  if (
+    text.includes('luan chuyen') ||
+    text.includes('luu kho') ||
+    text.includes('phan loai') ||
+    text.includes('sorting') ||
+    text.includes('transporting') ||
+    text.includes('storing')
+  ) return 'transporting';
+  if (
+    text.includes('da lay hang') ||
+    text.includes('dang lay hang') ||
+    text.includes('lay hang (thu tien)') ||
+    text.includes('picked') ||
+    text.includes('picking')
+  ) return 'picked';
+  if (text.includes('cho lay hang') || text.includes('ready to pick') || text.includes('ready_to_pick')) return 'ready';
+  if (text.includes('da huy') || text.includes('su co') || text.includes('that lac') || text.includes('hu hong')) return 'issue';
+  return text;
+}
+
+function cleanTimelineDetail(detail) {
+  return String(detail || '')
+    .split(/ · | Â· | Ã‚Â· /)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .slice(0, 2)
+    .join(' · ');
+}
+
+function canonicalTimelineTitle(family, fallbackTitle) {
+  const titles = {
+    ready: 'Chờ lấy hàng',
+    picked: 'Đã lấy hàng',
+    transporting: 'Đang luân chuyển',
+    delivering: 'Đang giao',
+    delivered: 'Giao thành công',
+    delivery_fail: 'Giao thất bại',
+    returned: 'Hoàn trả',
+    issue: 'Sự cố',
+    leadtime: 'Dự kiến giao hàng',
+  };
+
+  return titles[family] || fallbackTitle;
+}
+
+function compactTimelineDetail(family, detail) {
+  const cleaned = cleanTimelineDetail(detail);
+  const parts = cleaned
+    .split(/ · | Â· | Ã‚Â· /)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (!parts.length) return '';
+  if (family === 'leadtime') return 'Thời gian giao hàng dự kiến tới người nhận.';
+
+  if (family === 'delivered') {
+    return parts.find((part) => normalizeVietnameseText(part).includes('nguoi nhan')) || '';
+  }
+
+  if (family === 'delivery_fail' || family === 'returned' || family === 'issue') {
+    return parts[0];
+  }
+
+  return '';
+}
+
+export function buildTimelineForDisplay(order) {
+  const currentFamily = buildEventFamily(statusLabels[order?.status] || order?.status || '');
+  const preparedEvents = buildTimeline(order)
+    .filter((event) => !isNoiseTimelineTitle(event.title))
+    .map((event) => ({
+      ...event,
+      family: buildEventFamily(event.title),
+    }));
+
+  const latestByFamily = new Map();
+  for (const event of preparedEvents) {
+    if (!latestByFamily.has(event.family)) {
+      latestByFamily.set(event.family, {
+        ...event,
+        title: canonicalTimelineTitle(event.family, event.title),
+        detail: compactTimelineDetail(event.family, event.detail),
+      });
+    }
+  }
+
+  let familiesToShow = [];
+  if (currentFamily === 'returned') {
+    familiesToShow = ['returned'];
+  } else if (currentFamily === 'delivered') {
+    familiesToShow = ['delivered', 'delivering', 'transporting', 'picked', 'ready'];
+  } else if (currentFamily === 'delivery_fail') {
+    familiesToShow = ['delivery_fail', 'delivering', 'transporting', 'picked', 'ready'];
+  } else if (currentFamily === 'issue') {
+    familiesToShow = ['issue'];
+  } else {
+    // Normal active order flow
+    familiesToShow = [
+      ...(latestByFamily.has('delivered') ? ['delivered'] : []),
+      'leadtime',
+      'delivering',
+      'transporting',
+      'picked',
+      'ready',
+    ];
+  }
+
+  // Inject placeholders for missing standard families in familiesToShow
+  for (const family of familiesToShow) {
+    if (!latestByFamily.has(family)) {
+      latestByFamily.set(family, {
+        title: canonicalTimelineTitle(family, ''),
+        time: '',
+        detail: family === 'leadtime' ? 'Thời gian giao hàng dự kiến tới người nhận.' : '',
+        lat: null,
+        lng: null,
+        family,
+      });
+    }
+  }
+
+  return familiesToShow
+    .map((family) => latestByFamily.get(family))
+    .filter(Boolean)
+    .filter((event) => {
+      if (event.family === 'leadtime' && (currentFamily === 'delivered' || currentFamily === 'returned' || currentFamily === 'delivery_fail')) {
+        return false;
+      }
+      return true;
+    })
+    .map(({ family, ...event }) => event);
+}
+
 async function readOrdersDatabase() {
   const candidates = [
     resolve('ghn_orders.json'),
@@ -427,7 +603,7 @@ async function trackGhn(code) {
     ].filter(Boolean).join(' · ') || data?.message || 'Đã nhận dữ liệu từ GHN.',
     from_location: order.from_location || null,
     to_location: order.to_location || null,
-    events: buildTimeline(order),
+    events: buildTimelineForDisplay(order),
     raw: data,
   };
 }

@@ -356,7 +356,10 @@ export function buildTimelineForDisplay(order) {
     familiesToShow = ['delivered', 'delivering', 'transporting', 'picked', 'ready'];
   } else if (currentFamily === 'delivery_fail') {
     familiesToShow = ['delivery_fail', 'delivering', 'transporting', 'picked', 'ready'];
-  } else if (latestByFamily.has('delivering') || latestByFamily.has('leadtime')) {
+  } else if (currentFamily === 'issue') {
+    familiesToShow = ['issue'];
+  } else {
+    // Normal active order flow
     familiesToShow = [
       ...(latestByFamily.has('delivered') ? ['delivered'] : []),
       'leadtime',
@@ -365,16 +368,20 @@ export function buildTimelineForDisplay(order) {
       'picked',
       'ready',
     ];
-  } else if (latestByFamily.has('transporting')) {
-    familiesToShow = ['transporting', 'picked', 'ready'];
-  } else if (latestByFamily.has('picked')) {
-    familiesToShow = ['picked', 'ready'];
-  } else if (latestByFamily.has('ready')) {
-    familiesToShow = ['ready'];
-  } else if (latestByFamily.has('issue')) {
-    familiesToShow = ['issue'];
-  } else {
-    familiesToShow = [...latestByFamily.keys()];
+  }
+
+  // Inject placeholders for missing standard families in familiesToShow
+  for (const family of familiesToShow) {
+    if (!latestByFamily.has(family)) {
+      latestByFamily.set(family, {
+        title: canonicalTimelineTitle(family, ''),
+        time: '',
+        detail: family === 'leadtime' ? 'Thời gian giao hàng dự kiến tới người nhận.' : '',
+        lat: null,
+        lng: null,
+        family,
+      });
+    }
   }
 
   return familiesToShow
