@@ -1398,12 +1398,12 @@ h1 {
 }
 
 .map-marker--vehicle {
-  width: 52px;
-  height: 52px;
+  width: 42px;
+  height: 42px;
   z-index: 1000;
 }
 .map-marker--vehicle .map-marker__glyph {
-  font-size: 36px;
+  font-size: 28px;
 }
 
 .map-marker--recipient {

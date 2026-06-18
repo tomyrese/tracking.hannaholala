@@ -1237,9 +1237,9 @@ function createVehicleMarkerIcon({ emoji, hidden = false }) {
       </span>
     `,
     className: 'map-marker-wrap',
-    iconSize: [52, 52],
-    iconAnchor: [26, 26],
-    popupAnchor: [0, -30],
+    iconSize: [42, 42],
+    iconAnchor: [21, 21],
+    popupAnchor: [0, -24],
   });
 }
 
