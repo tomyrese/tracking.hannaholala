@@ -44,7 +44,9 @@ export function isOrderDelayed(result) {
   if (isNaN(leadtimeDate.getTime())) return false;
 
   const now = new Date();
-  const isTimePassed = now > leadtimeDate;
+  const delayedMs = now.getTime() - leadtimeDate.getTime();
+  const delayedDays = delayedMs / (1000 * 60 * 60 * 24);
+  const isTimePassed = delayedDays >= 5;
 
   const status = normalizeText(rawOrder.status || result.status || '');
   const isExcludedStatus = 

@@ -12,23 +12,35 @@ test('isOrderDelayed correctly identifies late shipments', () => {
     type: 'live',
     raw: {
       data: {
-        leadtime: new Date(now - 86400000).toISOString(),
+        leadtime: new Date(now - 6 * 86400000).toISOString(),
         status: 'delivered',
       }
     }
   }), false);
 
-  // Storing & past leadtime - delayed
+  // Storing & past leadtime (6 days ago) - delayed
   assert.equal(isOrderDelayed({
     ok: true,
     type: 'live',
     raw: {
       data: {
-        leadtime: new Date(now - 86400000).toISOString(),
+        leadtime: new Date(now - 6 * 86400000).toISOString(),
         status: 'storing',
       }
     }
   }), true);
+
+  // Storing & past leadtime (4 days ago) - not delayed enough (needs 5 days)
+  assert.equal(isOrderDelayed({
+    ok: true,
+    type: 'live',
+    raw: {
+      data: {
+        leadtime: new Date(now - 4 * 86400000).toISOString(),
+        status: 'storing',
+      }
+    }
+  }), false);
 
   // Transporting & future leadtime - not delayed
   assert.equal(isOrderDelayed({
@@ -48,7 +60,7 @@ test('isOrderDelayed correctly identifies late shipments', () => {
     type: 'live',
     raw: {
       data: {
-        leadtime: new Date(now - 86400000).toISOString(),
+        leadtime: new Date(now - 6 * 86400000).toISOString(),
         status: 'cancel',
       }
     }
@@ -74,7 +86,7 @@ test('handleDiscountRequest returns delayed status and claiming flows', async ()
       status: 'storing',
       raw: {
         data: {
-          leadtime: new Date(now - 86400000).toISOString(),
+          leadtime: new Date(now - 6 * 86400000).toISOString(),
           status: 'storing',
           to_phone: '0909123456',
         }
@@ -115,7 +127,7 @@ test('handleDiscountRequest returns delayed status and claiming flows', async ()
       status: 'storing',
       raw: {
         data: {
-          leadtime: new Date(now - 86400000).toISOString(),
+          leadtime: new Date(now - 6 * 86400000).toISOString(),
           status: 'storing',
           to_phone: '0909123456',
         }

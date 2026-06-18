@@ -499,8 +499,8 @@ function renderDiscountPanel(preparedResult, discountData) {
   if (discountData.claimed) {
     discountPanel.innerHTML = `
       <div class="review-panel__card" style="text-align: center; display: grid; justify-items: center; gap: 8px; border: 1px solid #c2e0b4; background: #f2f9f1;">
-        <h3 style="font-size: 15px; margin: 0; color: #385723;">Quà tặng giao trễ từ Hannah Olala</h3>
-        <p style="margin: 0; color: #548235; font-size: 12px;">Thành thật xin lỗi vì đơn hàng giao trễ hơn dự kiến. Đây là mã giảm giá 50.000đ dành riêng cho bạn:</p>
+        <h3 style="font-size: 15px; margin: 0; color: #385723;">Quà tặng giao trễ từ Bếp Ngọc Bảo</h3>
+        <p style="margin: 0; color: #548235; font-size: 12px;">Thành thật xin lỗi vì đơn hàng giao trễ hơn dự kiến. Đây là mã giảm giá 50.000đ khi mua hàng tại Bếp Ngọc Bảo dành riêng cho bạn:</p>
         <div style="display: flex; gap: 8px; align-items: center; margin-top: 6px;">
           <strong id="discount-code-val" style="font-size: 16px; background: #ffffff; border: 2px dashed #a9d18e; padding: 6px 12px; border-radius: 8px; color: #385723; letter-spacing: 1px;">${discountData.code}</strong>
           <button id="btn-copy-discount" class="track-button" style="min-height: 34px; padding: 0 12px; font-size: 11px; border-radius: 8px; background: var(--beige); color: #6f554b; border: 1px solid #efd2c8;">Sao chép</button>
@@ -523,8 +523,8 @@ function renderDiscountPanel(preparedResult, discountData) {
   } else {
     discountPanel.innerHTML = `
       <div class="review-panel__card" style="text-align: center; display: grid; justify-items: center; gap: 8px;">
-        <h3 style="font-size: 15px; margin: 0;">Quà tặng giao trễ từ Hannah Olala</h3>
-        <p style="margin: 0; color: var(--muted); font-size: 12px;">Đơn hàng của bạn bị giao trễ hơn so với thời gian dự kiến. Hãy nhận một mã giảm giá 50.000đ làm quà xin lỗi nhé!</p>
+        <h3 style="font-size: 15px; margin: 0;">Quà tặng giao trễ từ Bếp Ngọc Bảo</h3>
+        <p style="margin: 0; color: var(--muted); font-size: 12px;">Đơn hàng của bạn bị giao trễ hơn so với thời gian dự kiến. Hãy nhận một mã giảm giá 50.000đ khi mua hàng tại Bếp Ngọc Bảo làm quà xin lỗi nhé!</p>
         <button id="btn-claim-discount" class="track-button" style="min-height: 38px; padding: 0 16px; font-size: 12px; margin-top: 4px; background: var(--rose); color: var(--white);">Nhận mã giảm giá</button>
       </div>
     `;
@@ -749,7 +749,7 @@ function updateDetection(rawCode) {
       ? `Đã nhận mã ${carrier.code}.`
       : hasCode
         ? 'Mã chưa hợp lệ. Vui lòng nhập mã vận đơn hoặc số điện thoại.'
-        : 'Nhập mã vận đơn hoặc số điện thoại để tra cứu trạng thái.';
+        : 'Nếu đơn hàng trễ 5 ngày bạn sẽ nhận được voucher khi mua hàng tại Bếp Ngọc Bảo trị giá 50.000VNĐ';
 
   resultGrid.hidden = false;
   detectAlert.hidden = !hasCode || isDetected;
