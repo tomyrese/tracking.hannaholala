@@ -1527,6 +1527,8 @@ async function renderRoadJourneyMap(result) {
     {
       delivered: isDeliveredJourney,
       originPoint: journey.origin,
+      routeGeometry: routePlan.routeGeometry,
+      vehicleRouteIndex: currentRouteModel.vehicleRouteIndex,
     },
   );
 

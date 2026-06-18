@@ -110,6 +110,36 @@ function enrichStepStates(steps, activeStepIndex) {
   }));
 }
 
+function shiftPointAlongRoute(routeGeometry, currentIndex, distanceOffset, direction = 'backward') {
+  if (!Array.isArray(routeGeometry) || routeGeometry.length === 0) return null;
+  
+  let index = Math.max(0, Math.min(currentIndex ?? 0, routeGeometry.length - 1));
+  let accumulatedDistance = 0;
+  
+  while (true) {
+    let nextIndex = direction === 'backward' ? index - 1 : index + 1;
+    if (nextIndex < 0 || nextIndex >= routeGeometry.length) {
+      return { ...routeGeometry[index] };
+    }
+    
+    const p1 = routeGeometry[index];
+    const p2 = routeGeometry[nextIndex];
+    const dist = Math.hypot(p2.lat - p1.lat, p2.lng - p1.lng);
+    
+    accumulatedDistance += dist;
+    index = nextIndex;
+    
+    if (accumulatedDistance >= distanceOffset) {
+      const overshoot = accumulatedDistance - distanceOffset;
+      const t = dist > 0 ? (overshoot / dist) : 0;
+      return {
+        lat: p2.lat + (p1.lat - p2.lat) * t,
+        lng: p2.lng + (p1.lng - p2.lng) * t
+      };
+    }
+  }
+}
+
 export class TrackingRouteManager {
   constructor(result, options = {}) {
     this.result = result || {};
@@ -333,7 +363,7 @@ export class TrackingRouteManager {
     const activeRouteIndex = vehicleRouteIndex ?? this.getRouteIndexForStep(stepIndex);
     const truckPoint = this.getRoutePoint(activeRouteIndex);
     const recipientPoint = clonePoint(this.destinationPoint);
-    const display = this.preventMarkerOverlap(truckPoint, recipientPoint, { delivered });
+    const display = this.preventMarkerOverlap(truckPoint, recipientPoint, { delivered, routeIndex: activeRouteIndex });
 
     return {
       delivered,
@@ -362,7 +392,7 @@ export class TrackingRouteManager {
   }
 
   preventMarkerOverlap(truckPoint, recipientPoint, options = {}) {
-    const { delivered = false } = options;
+    const { delivered = false, routeIndex = null } = options;
 
     if (!truckPoint || !recipientPoint) {
       return {
@@ -372,24 +402,27 @@ export class TrackingRouteManager {
       };
     }
 
+    const recipientDisplayPoint = clonePoint(recipientPoint);
+
     if (!this.isNearPoint(truckPoint, recipientPoint)) {
       return {
         truckDisplayPoint: clonePoint(truckPoint),
-        recipientDisplayPoint: clonePoint(recipientPoint),
+        recipientDisplayPoint,
         hasVisualSeparation: false,
       };
     }
 
     const baseSpacing = delivered ? OVERLAP_OFFSET * 1.35 : OVERLAP_OFFSET;
+    const routeGeometry = this.model?.routeGeometry || [truckPoint, recipientPoint];
+    const currentIndex = routeIndex !== null ? routeIndex : (routeGeometry.length - 1);
+    const truckDisplayPoint = shiftPointAlongRoute(routeGeometry, currentIndex, baseSpacing, 'backward') || {
+      lat: truckPoint.lat,
+      lng: truckPoint.lng - baseSpacing,
+    };
+
     return {
-      truckDisplayPoint: {
-        lat: truckPoint.lat,
-        lng: truckPoint.lng - baseSpacing,
-      },
-      recipientDisplayPoint: {
-        lat: recipientPoint.lat,
-        lng: recipientPoint.lng + baseSpacing,
-      },
+      truckDisplayPoint,
+      recipientDisplayPoint,
       hasVisualSeparation: true,
     };
   }
