@@ -1244,7 +1244,7 @@ function createVehicleMarkerIcon({ emoji }) {
 }
 
 function createRecipientMarkerIcon({ delivered = false } = {}) {
-  const pinColor = '#d9485f';
+  const pinColor = delivered ? '#248f67' : '#2196f3';
   return L.divIcon({
     html: `
       <span class="map-marker map-marker--recipient" style="width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; position: relative;">

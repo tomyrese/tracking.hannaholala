@@ -1465,23 +1465,23 @@ h1 {
   box-sizing: border-box;
 }
 
-/* Completed checkpoints use filled color */
+/* Completed checkpoints use filled color matching completed route */
 .map-checkpoint-dot--completed {
-  background: #d9485f; /* filled with theme rose color */
-  border: 2px solid #d9485f;
+  background: #90caf9;
+  border: 2px solid #90caf9;
 }
 
 .map-checkpoint-dot--active {
-  background: #d9485f;
-  border: 2px solid #d9485f;
+  background: #2196f3;
+  border: 2px solid #2196f3;
   transform: scale(1.25);
-  box-shadow: 0 0 0 2px rgba(217, 72, 95, 0.25);
+  box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.25);
 }
 
-/* Upcoming checkpoints use outlined circles */
+/* Upcoming checkpoints use outlined circles matching remaining route */
 .map-checkpoint-dot--upcoming {
   background: #ffffff;
-  border: 2.5px solid #d9485f; /* Outlined circle with theme rose border */
+  border: 2.5px solid #2196f3;
 }
 
 /* Keep original test classes with display: none to satisfy tests without displaying them */
