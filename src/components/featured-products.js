@@ -148,13 +148,13 @@ function initSlider(root, grid) {
   };
 
   btnLeft.addEventListener('click', () => {
-    // Scroll by roughly 3 items (192px each including gap)
-    grid.scrollBy({ left: -192 * 3, behavior: 'smooth' });
+    // Scroll by exactly 1 item (192px including gap)
+    grid.scrollBy({ left: -192, behavior: 'smooth' });
   });
 
   btnRight.addEventListener('click', () => {
-    // Scroll by roughly 3 items (192px each including gap)
-    grid.scrollBy({ left: 192 * 3, behavior: 'smooth' });
+    // Scroll by exactly 1 item (192px including gap)
+    grid.scrollBy({ left: 192, behavior: 'smooth' });
   });
 
   grid.addEventListener('scroll', updateArrows, { passive: true });
