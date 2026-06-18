@@ -134,6 +134,43 @@ function attachCardEvents(root) {
   });
 }
 
+function initSlider(root, grid) {
+  const btnLeft = root.querySelector('[data-products-arrow-left]');
+  const btnRight = root.querySelector('[data-products-arrow-right]');
+  if (!btnLeft || !btnRight) return;
+
+  const updateArrows = () => {
+    const scrollLeft = grid.scrollLeft;
+    const maxScroll = grid.scrollWidth - grid.clientWidth;
+    
+    btnLeft.disabled = scrollLeft <= 2;
+    btnRight.disabled = scrollLeft >= maxScroll - 2;
+  };
+
+  btnLeft.addEventListener('click', () => {
+    // Scroll by roughly 3 items (192px each including gap)
+    grid.scrollBy({ left: -192 * 3, behavior: 'smooth' });
+  });
+
+  btnRight.addEventListener('click', () => {
+    // Scroll by roughly 3 items (192px each including gap)
+    grid.scrollBy({ left: 192 * 3, behavior: 'smooth' });
+  });
+
+  grid.addEventListener('scroll', updateArrows, { passive: true });
+  
+  // Use ResizeObserver to update arrow status on screen resize
+  if (window.ResizeObserver) {
+    const observer = new ResizeObserver(() => {
+      updateArrows();
+    });
+    observer.observe(grid);
+  }
+
+  // Initial update
+  updateArrows();
+}
+
 export async function mountFeaturedProducts() {
   const root = document.querySelector('[data-featured-products]');
   if (!root) return;
@@ -145,7 +182,8 @@ export async function mountFeaturedProducts() {
 
   try {
     const payload = await fetchFeaturedProducts();
-    const products = Array.isArray(payload?.products) ? payload.products.slice(0, 5) : [];
+    // Do not slice to 5, allow all loaded products (up to 12) to be displayed
+    const products = Array.isArray(payload?.products) ? payload.products : [];
 
     if (!payload?.ok || products.length === 0) {
       throw new Error(payload?.message || 'Khong the tai san pham');
@@ -155,6 +193,7 @@ export async function mountFeaturedProducts() {
 
     attachCardEvents(grid);
     injectProductSchema(products);
+    initSlider(root, grid);
   } catch (error) {
     grid.innerHTML = '';
   }
