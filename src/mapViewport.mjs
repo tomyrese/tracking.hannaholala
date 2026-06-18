@@ -1,5 +1,5 @@
-const DEFAULT_THRESHOLD = 0.001;
-const DEFAULT_OFFSET = 0.0008;
+const DEFAULT_THRESHOLD = 0.0002;
+const DEFAULT_OFFSET = 0.00015;
 
 export function buildMarkerDisplayState(truckPoint, recipientPoint) {
   const options = arguments[2] || {};

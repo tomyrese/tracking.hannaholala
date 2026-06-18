@@ -441,6 +441,23 @@ async function callGhnDetail(carrier, code, lookup) {
     body: JSON.stringify(lookup.body),
   });
 
+  const order = data?.data || {};
+  try {
+    const content = await readFile(`${rootDir}/ghn_orders.json`, 'utf8');
+    const orders = JSON.parse(content);
+    const localOrder = orders.find((o) => o.order_code === code || o.client_order_code === code);
+    if (localOrder) {
+      if (!order.to_location && localOrder.to_location) {
+        order.to_location = localOrder.to_location;
+      }
+      if (!order.from_location && localOrder.from_location) {
+        order.from_location = localOrder.from_location;
+      }
+    }
+  } catch (err) {
+    console.warn('[Local Merge] Failed to merge local order locations:', err.message);
+  }
+
   return normalizeGhnResponse(data, carrier, code, lookup.mode);
 }
 

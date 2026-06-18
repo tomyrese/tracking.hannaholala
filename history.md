@@ -401,3 +401,22 @@
 - Implemented Vietnam coordinate boundary validation inside `readLocationPoint` and `readEventPoint` in `src/TrackingRouteManager.mjs`. This prevents faulty coordinates (e.g., driver scan logs with negative longitudes like `-27`) from being parsed as valid map coordinates.
 - Fixed the destination point resolution logic. Previously, when the delivery coordinate (`to_location`) was null/invalid, the destination collapsed to the current GPS position (`rawEvents[0]`), which made the route end prematurely at the truck and misplaced the recipient icon. Now, if the delivery coordinates are missing/invalid, the destination correctly falls back to either the coordinates of a delivered event, an expected delivery event, or the default fallback destination (HCMC center), preserving the full route line.
 
+## Recent Updates (Merge Live details with local coordinates, and reduce truck offset)
+### Modified files
+- [trackingApi.mjs](file:///d:/Work/HOtracking/src/trackingApi.mjs)
+- [netlify/functions/track.js](file:///d:/Work/HOtracking/netlify/functions/track.js)
+- [mapViewport.mjs](file:///d:/Work/HOtracking/src/mapViewport.mjs)
+- [history.md](file:///d:/Work/HOtracking/history.md)
+
+### Commands executed
+- `npm test`
+- `git config user.name "Wuys"`
+- `git config user.email "phuquynguyen458@gmail.com"`
+- `git add src/trackingApi.mjs netlify/functions/track.js src/mapViewport.mjs history.md`
+- `git commit -m "feat: merge local coordinates into live API response and reduce truck overlap offset"`
+- `git push origin main`
+
+### Fixes applied
+- Resolved the issue where live API responses return null/missing `to_location` and `from_location` coordinates, causing the map route to fall back to the HCMC coordinate (which happened to be close to the user's location). Now, the server queries the local synchronized database `ghn_orders.json` to lookup the order and merges the geocoded locations into the live API response.
+- Reduced the default overlap threshold to `0.0002` and the overlap offset to `0.00015` in `src/mapViewport.mjs`. This prevents the truck marker `🚚` from jumping blocks away and floating off the road at street-level zoom levels.
+

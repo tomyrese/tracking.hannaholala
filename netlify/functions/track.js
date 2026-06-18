@@ -325,6 +325,21 @@ async function trackGhn(code) {
   });
 
   const order = data?.data || {};
+  try {
+    const localOrders = await readOrdersDatabase();
+    const localOrder = localOrders.find((o) => o.order_code === code || o.client_order_code === code);
+    if (localOrder) {
+      if (!order.to_location && localOrder.to_location) {
+        order.to_location = localOrder.to_location;
+      }
+      if (!order.from_location && localOrder.from_location) {
+        order.from_location = localOrder.from_location;
+      }
+    }
+  } catch (err) {
+    console.warn('[Sync Fallback] Failed to read local database:', err.message);
+  }
+
   const status = order.status || order.current_status || '';
   const feeParts = [
     order.main_service ? `Phí giao: ${formatMoney(order.main_service)}` : '',
