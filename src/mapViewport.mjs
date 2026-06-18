@@ -1,6 +1,36 @@
 const DEFAULT_THRESHOLD = 0.0002;
 const DEFAULT_OFFSET = 0.00015;
 
+export function shiftPointAlongRoute(routeGeometry, currentIndex, distanceOffset, direction = 'backward') {
+  if (!Array.isArray(routeGeometry) || routeGeometry.length === 0) return null;
+  
+  let index = Math.max(0, Math.min(currentIndex ?? 0, routeGeometry.length - 1));
+  let accumulatedDistance = 0;
+  
+  while (true) {
+    let nextIndex = direction === 'backward' ? index - 1 : index + 1;
+    if (nextIndex < 0 || nextIndex >= routeGeometry.length) {
+      return { ...routeGeometry[index] }; // fallback to boundary point
+    }
+    
+    const p1 = routeGeometry[index];
+    const p2 = routeGeometry[nextIndex];
+    const dist = Math.hypot(p2.lat - p1.lat, p2.lng - p1.lng);
+    
+    accumulatedDistance += dist;
+    index = nextIndex;
+    
+    if (accumulatedDistance >= distanceOffset) {
+      const overshoot = accumulatedDistance - distanceOffset;
+      const t = dist > 0 ? (overshoot / dist) : 0;
+      return {
+        lat: p2.lat + (p1.lat - p2.lat) * t,
+        lng: p2.lng + (p1.lng - p2.lng) * t
+      };
+    }
+  }
+}
+
 export function buildMarkerDisplayState(truckPoint, recipientPoint) {
   const options = arguments[2] || {};
   const {
@@ -8,6 +38,10 @@ export function buildMarkerDisplayState(truckPoint, recipientPoint) {
     overlapThreshold = DEFAULT_THRESHOLD,
     overlapOffset = DEFAULT_OFFSET,
     originPoint = null,
+    routeGeometry = null,
+    vehicleRouteIndex = null,
+    isPickingPhase = false,
+    isDeliveryPhase = false,
   } = options;
 
   let truckDisplay = truckPoint ? { ...truckPoint } : null;
@@ -23,7 +57,16 @@ export function buildMarkerDisplayState(truckPoint, recipientPoint) {
 
     if (nearEachOther) {
       const effectiveOffset = delivered ? overlapOffset * 1.5 : overlapOffset;
-      truckDisplay.lng = truckPoint.lng - effectiveOffset;
+      if (Array.isArray(routeGeometry) && vehicleRouteIndex !== null) {
+        const shifted = shiftPointAlongRoute(routeGeometry, vehicleRouteIndex, effectiveOffset, 'backward');
+        if (shifted) {
+          truckDisplay = shifted;
+        } else {
+          truckDisplay.lng = truckPoint.lng - effectiveOffset;
+        }
+      } else {
+        truckDisplay.lng = truckPoint.lng - effectiveOffset;
+      }
       hasVisualSeparation = true;
     }
   }
@@ -35,7 +78,17 @@ export function buildMarkerDisplayState(truckPoint, recipientPoint) {
       Math.abs(truckDisplay.lng - originDisplay.lng) <= overlapThreshold;
 
     if (nearOrigin) {
-      truckDisplay.lng = truckPoint.lng + overlapOffset;
+      const effectiveOffset = overlapOffset;
+      if (Array.isArray(routeGeometry) && vehicleRouteIndex !== null) {
+        const shifted = shiftPointAlongRoute(routeGeometry, vehicleRouteIndex, effectiveOffset, 'forward');
+        if (shifted) {
+          truckDisplay = shifted;
+        } else {
+          truckDisplay.lng = truckPoint.lng + effectiveOffset;
+        }
+      } else {
+        truckDisplay.lng = truckPoint.lng + effectiveOffset;
+      }
       hasVisualSeparation = true;
     }
   }

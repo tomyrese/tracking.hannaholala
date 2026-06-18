@@ -1198,6 +1198,10 @@ function applyRouteFocus(routeModel, focusedTimelineIndex = null) {
       {
         delivered: markerState.delivered,
         originPoint: routeModel.originPoint,
+        routeGeometry: routeModel.manager.model.routeGeometry,
+        vehicleRouteIndex: currentRouteModel.vehicleRouteIndex,
+        isPickingPhase,
+        isDeliveryPhase,
       },
     );
 
@@ -1274,6 +1278,9 @@ function applyRouteFocus(routeModel, focusedTimelineIndex = null) {
             const displayState = buildMarkerDisplayState(point, retreatState.recipientPoint, {
               delivered: true,
               originPoint: routeModel.originPoint,
+              routeGeometry: routeModel.manager.model.routeGeometry,
+              vehicleRouteIndex: currentRouteModel.vehicleRouteIndex,
+              isDeliveryPhase: true,
             });
             displayState.originDisplayPoint = null;
             if (originMarker && displayState.originDisplayPoint) {
