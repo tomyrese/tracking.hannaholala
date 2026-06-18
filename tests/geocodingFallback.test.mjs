@@ -22,28 +22,20 @@ const mockOrders = [
   }
 ];
 
-test('findCoordinatesByWardOrDistrict matches by ward code correctly', () => {
+test('findCoordinatesByWardOrDistrict no longer maps ward codes to borrowed coordinates', () => {
   const coord1 = findCoordinatesByWardOrDistrict(mockOrders, '12345', null);
-  assert.ok(coord1);
-  assert.equal(coord1.lat, 10.1);
-  assert.equal(coord1.lng, 106.1);
-
   const coord2 = findCoordinatesByWardOrDistrict(mockOrders, '09876', null);
-  assert.ok(coord2);
-  assert.equal(coord2.lat, 10.4);
-  assert.equal(coord2.lng, 106.4);
+
+  assert.equal(coord1, null);
+  assert.equal(coord2, null);
 });
 
-test('findCoordinatesByWardOrDistrict matches by district ID when ward code is missing or not found', () => {
+test('findCoordinatesByWardOrDistrict no longer maps district ids to borrowed coordinates', () => {
   const coord1 = findCoordinatesByWardOrDistrict(mockOrders, null, 111);
-  assert.ok(coord1);
-  assert.equal(coord1.lat, 10.1);
-  assert.equal(coord1.lng, 106.1);
-
   const coord2 = findCoordinatesByWardOrDistrict(mockOrders, '99999', 444);
-  assert.ok(coord2);
-  assert.equal(coord2.lat, 10.4);
-  assert.equal(coord2.lng, 106.4);
+
+  assert.equal(coord1, null);
+  assert.equal(coord2, null);
 });
 
 test('findCoordinatesByWardOrDistrict returns null if no match found', () => {
@@ -53,12 +45,10 @@ test('findCoordinatesByWardOrDistrict returns null if no match found', () => {
 
 test('netlify track.js version of findCoordinatesByWardOrDistrict behaves identically', () => {
   const coord = findCoordinatesByWardOrDistrictTrack(mockOrders, '12345', null);
-  assert.ok(coord);
-  assert.equal(coord.lat, 10.1);
-  assert.equal(coord.lng, 106.1);
+  assert.equal(coord, null);
 });
 
-test('trackShipment integrates geocoding fallback for live GHN API when coordinates are missing', async () => {
+test('trackShipment keeps missing live GHN coordinates as null instead of inferring them from ward or district', async () => {
   const oldToken = process.env.GHN_TOKEN;
   const oldShopId = process.env.GHN_SHOP_ID;
   process.env.GHN_TOKEN = 'mock-token';
@@ -89,14 +79,9 @@ test('trackShipment integrates geocoding fallback for live GHN API when coordina
     const result = await trackShipment('NEW12345');
     assert.equal(result.ok, true);
     assert.equal(result.type, 'live');
-    
-    assert.ok(result.from_location);
-    assert.equal(result.from_location.lat, 10.857213);
-    assert.equal(result.from_location.lng, 106.7081402);
-    
-    assert.ok(result.to_location);
-    assert.equal(result.to_location.lat, 20.9983795);
-    assert.equal(result.to_location.lng, 105.8161161);
+
+    assert.equal(result.from_location, null);
+    assert.equal(result.to_location, null);
   } finally {
     globalThis.fetch = originalFetch;
     if (oldToken === undefined) delete process.env.GHN_TOKEN;
@@ -106,3 +91,39 @@ test('trackShipment integrates geocoding fallback for live GHN API when coordina
   }
 });
 
+test('trackShipment does not copy coordinates from a matching local order when the live GHN payload omits them', async () => {
+  const oldToken = process.env.GHN_TOKEN;
+  const oldShopId = process.env.GHN_SHOP_ID;
+  process.env.GHN_TOKEN = 'mock-token';
+  process.env.GHN_SHOP_ID = 'mock-shop-id';
+
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({
+    ok: true,
+    async text() {
+      return JSON.stringify({
+        code: 200,
+        message: 'Success',
+        data: {
+          order_code: 'GYHTE6W9',
+          client_order_code: 'HO1743654',
+          status: 'delivering',
+        },
+      });
+    },
+  });
+
+  try {
+    const result = await trackShipment('HO1743654');
+    assert.equal(result.ok, true);
+    assert.equal(result.type, 'live');
+    assert.equal(result.from_location, null);
+    assert.equal(result.to_location, null);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (oldToken === undefined) delete process.env.GHN_TOKEN;
+    else process.env.GHN_TOKEN = oldToken;
+    if (oldShopId === undefined) delete process.env.GHN_SHOP_ID;
+    else process.env.GHN_SHOP_ID = oldShopId;
+  }
+});

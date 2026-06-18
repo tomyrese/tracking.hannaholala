@@ -61,6 +61,36 @@ function distanceSquared(a, b) {
   return (deltaLat ** 2) + (deltaLng ** 2);
 }
 
+function distanceInMeters(a, b) {
+  if (!a || !b) return Infinity;
+  const toRadians = (value) => (value * Math.PI) / 180;
+  const earthRadiusMeters = 6371000;
+  const deltaLat = toRadians(b.lat - a.lat);
+  const deltaLng = toRadians(b.lng - a.lng);
+  const startLat = toRadians(a.lat);
+  const endLat = toRadians(b.lat);
+  const haversine = (
+    (Math.sin(deltaLat / 2) ** 2) +
+    (Math.cos(startLat) * Math.cos(endLat) * (Math.sin(deltaLng / 2) ** 2))
+  );
+
+  return 2 * earthRadiusMeters * Math.asin(Math.sqrt(haversine));
+}
+
+function allPointsStayWithinMeters(points, limitMeters) {
+  if (!Array.isArray(points) || points.length < 2) return false;
+
+  for (let index = 0; index < points.length; index += 1) {
+    for (let compareIndex = index + 1; compareIndex < points.length; compareIndex += 1) {
+      if (distanceInMeters(points[index], points[compareIndex]) >= limitMeters) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
 function classifyTrackingEvent(event, index) {
   const title = String(event?.title || '');
   const text = normalizeText(title);
@@ -171,17 +201,10 @@ export class TrackingRouteManager {
 
   generateRoutePoints() {
     const rawEvents = Array.isArray(this.result?.events) ? this.result.events : [];
-    const eventPoints = rawEvents.map(readEventPoint).filter(Boolean);
-    const firstEventPoint = eventPoints.at(-1) || null;
-    const lastEventPoint = eventPoints[0] || null;
-
-    const fallbackO = firstEventPoint || this.fallbackOrigin;
-    const fallbackD = lastEventPoint || fallbackO || this.fallbackDestination;
 
     const originPoint =
       readLocationPoint(this.result?.from_location) ||
-      readEventPoint(rawEvents.at(-1)) ||
-      fallbackO;
+      null;
     const deliveredEvent = rawEvents.find(e => {
       const text = String(e?.title || '').toLowerCase();
       return text.includes('giao thanh cong') || text.includes('giao hang thanh cong') || text.includes('delivered');
@@ -194,7 +217,7 @@ export class TrackingRouteManager {
       readLocationPoint(this.result?.to_location) ||
       readEventPoint(deliveredEvent) ||
       readEventPoint(expectedEvent) ||
-      fallbackD;
+      null;
 
     const selectedByPhase = new Map();
     rawEvents.forEach((event, rawIndex) => {
@@ -214,12 +237,46 @@ export class TrackingRouteManager {
       });
     });
 
-    const stepsChronological = Array.from(selectedByPhase.values())
+    let stepsChronological = Array.from(selectedByPhase.values())
       .sort((a, b) => a.rank - b.rank)
       .map((step, stepIndex) => ({
         ...step,
         stepIndex,
       }));
+
+    const rawStepsWithCoordinates = stepsChronological
+      .filter((step) => step.hasRealPoint && step.point)
+      .map((step) => ({
+        stepIndex: step.stepIndex,
+        title: step.title,
+        point: clonePoint(step.point),
+      }));
+
+    const ignoreClusteredStepPoints = allPointsStayWithinMeters(
+      rawStepsWithCoordinates.map((step) => step.point),
+      500,
+    );
+
+    if (ignoreClusteredStepPoints) {
+      stepsChronological = stepsChronological.map((step) => ({
+        ...step,
+        point: null,
+        hasRealPoint: false,
+      }));
+    }
+
+    const stepsWithCoordinates = stepsChronological
+      .filter((step) => step.hasRealPoint && step.point)
+      .map((step) => ({
+        stepIndex: step.stepIndex,
+        title: step.title,
+        lat: step.point.lat,
+        lng: step.point.lng,
+      }));
+
+    console.log('Origin:', originPoint);
+    console.log('Destination:', destinationPoint);
+    console.log('Steps with coordinates:', stepsWithCoordinates);
 
     this.originPoint = clonePoint(originPoint);
     this.destinationPoint = clonePoint(destinationPoint);
@@ -286,6 +343,7 @@ export class TrackingRouteManager {
     }
 
     const routeIndexByStep = this.buildTimelinePoints(normalizedPoints, this.stepsChronological.length);
+    const currentRouteIndex = this.getRouteIndexForStep(this.activeStepIndex, routeIndexByStep, normalizedPoints.length - 1);
 
     this.model = {
       ...this.model,
@@ -293,16 +351,16 @@ export class TrackingRouteManager {
       routeGeometryByStep: routeIndexByStep,
       originRouteIndex: 0,
       destinationRouteIndex: normalizedPoints.length - 1,
-      current: this.getRoutePoint(routeIndexByStep.get(this.activeStepIndex) ?? normalizedPoints.length - 1),
+      current: this.getRoutePoint(currentRouteIndex),
     };
 
     this.stepsChronological = this.stepsChronological.map((step) => {
-      const routeIndex = routeIndexByStep.get(step.stepIndex) ?? 0;
+      const routeIndex = routeIndexByStep.get(step.stepIndex);
       return {
         ...step,
-        routeIndex,
-        point: clonePoint(normalizedPoints[routeIndex]),
-        isRoutePoint: true,
+        routeIndex: routeIndex ?? null,
+        point: routeIndex === undefined ? null : clonePoint(normalizedPoints[routeIndex]),
+        isRoutePoint: routeIndex !== undefined,
       };
     });
     this.timelineSteps = [...this.stepsChronological].sort((a, b) => b.stepIndex - a.stepIndex);
@@ -353,11 +411,6 @@ export class TrackingRouteManager {
       return bestIndex;
     };
 
-    const knownAssignments = [
-      { stepIndex: -1, routeIndex: 0 },
-      { stepIndex: totalSteps, routeIndex: routeCoords.length - 1 },
-    ];
-
     const stepAnchorByStepIndex = new Map(
       this.stepsChronological
         .filter((step) => hasFinitePoint(step.anchorPoint))
@@ -372,60 +425,30 @@ export class TrackingRouteManager {
       const routeIndex = locateNearestRouteIndex(anchorPoint, minimumRouteIndex);
       if (routeIndex === null) continue;
 
-      knownAssignments.push({ stepIndex, routeIndex });
-      minimumRouteIndex = routeIndex;
-    }
-
-    knownAssignments.sort((a, b) => a.stepIndex - b.stepIndex);
-
-    const explicitAssignments = new Map(
-      knownAssignments
-        .filter((assignment) => assignment.stepIndex >= 0 && assignment.stepIndex < totalSteps)
-        .map((assignment) => [assignment.stepIndex, assignment.routeIndex]),
-    );
-
-    if (!explicitAssignments.size) {
-      if (totalSteps === 1) {
-        result.set(0, routeCoords.length - 1);
-        return result;
-      }
-
-      for (let index = 0; index < totalSteps; index += 1) {
-        const ratio = index / (totalSteps - 1);
-        const routeIndex = Math.round(ratio * (routeCoords.length - 1));
-        result.set(index, routeIndex);
-      }
-
-      return result;
-    }
-
-    for (let stepIndex = 0; stepIndex < totalSteps; stepIndex += 1) {
-      if (explicitAssignments.has(stepIndex)) {
-        result.set(stepIndex, explicitAssignments.get(stepIndex));
-        continue;
-      }
-
-      const nextBoundaryIndex = knownAssignments.findIndex((assignment) => assignment.stepIndex > stepIndex);
-      const previousAssignment = knownAssignments[Math.max(0, nextBoundaryIndex - 1)] || knownAssignments[0];
-      const nextAssignment = knownAssignments[Math.max(0, nextBoundaryIndex)] || knownAssignments.at(-1);
-
-      if (!nextAssignment || previousAssignment.stepIndex === nextAssignment.stepIndex) {
-        result.set(stepIndex, previousAssignment?.routeIndex ?? 0);
-        continue;
-      }
-
-      const ratio = (stepIndex - previousAssignment.stepIndex) / (nextAssignment.stepIndex - previousAssignment.stepIndex);
-      const routeIndex = Math.round(
-        previousAssignment.routeIndex + ((nextAssignment.routeIndex - previousAssignment.routeIndex) * ratio),
-      );
       result.set(stepIndex, routeIndex);
+      minimumRouteIndex = routeIndex;
     }
 
     return result;
   }
 
-  getRouteIndexForStep(stepIndex = this.activeStepIndex) {
-    return this.model.routeGeometryByStep.get(stepIndex) ?? this.model.originRouteIndex;
+  getRouteIndexForStep(stepIndex = this.activeStepIndex, routeGeometryByStep = this.model.routeGeometryByStep, destinationRouteIndex = this.model.destinationRouteIndex) {
+    if (routeGeometryByStep?.has(stepIndex)) {
+      return routeGeometryByStep.get(stepIndex);
+    }
+
+    for (let index = stepIndex; index >= 0; index -= 1) {
+      if (routeGeometryByStep?.has(index)) {
+        return routeGeometryByStep.get(index);
+      }
+    }
+
+    const step = this.stepsChronological[stepIndex] || null;
+    if (step?.phase === 'delivered') {
+      return destinationRouteIndex;
+    }
+
+    return this.model.originRouteIndex;
   }
 
   getRoutePoint(index) {

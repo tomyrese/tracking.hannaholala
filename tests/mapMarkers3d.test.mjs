@@ -59,6 +59,15 @@ test('timeline and marker focus are synchronized both ways through shared route 
   assert.match(appSource, /destinationMarker\.on\('click'/);
 });
 
+test('map focus and checkpoint markers now depend on real route geometry instead of synthetic checkpoint positions', () => {
+  assert.match(appSource, /routeGeometryPoints/);
+  assert.match(appSource, /map\.fitBounds\(L\.latLngBounds\(routeGeometryPoints\)/);
+  assert.match(appSource, /filter\(\(step\) => step\.hasRealPoint && step\.point && step\.phase !== 'order_created' && step\.phase !== 'delivered'\)/);
+  assert.match(routeManagerSource, /console\.log\('Origin:', originPoint\)/);
+  assert.match(routeManagerSource, /console\.log\('Destination:', destinationPoint\)/);
+  assert.match(routeManagerSource, /console\.log\('Steps with coordinates:', stepsWithCoordinates\)/);
+});
+
 test('truck movement animates smoothly along the route without rotating the emoji glyph', () => {
   assert.match(appSource, /function animateMarkerAlongPath\(marker,\s*pathPoints/);
   assert.match(appSource, /requestAnimationFrame\(tick\)/);

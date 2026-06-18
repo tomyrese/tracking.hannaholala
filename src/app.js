@@ -986,9 +986,31 @@ function isDeliveredResult(result, journey) {
   );
 }
 
-function fitMarkerViewport(map, markerDisplayState) {
-  if (!map || !markerDisplayState) return;
+function fitMarkerViewport(map, markerDisplayState, routeGeometry = []) {
+  if (!map) return;
 
+  const routeGeometryPoints = Array.isArray(routeGeometry)
+    ? routeGeometry
+      .map((point) => Array.isArray(point) ? point : [point.lat, point.lng])
+      .filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng))
+    : [];
+
+  if (routeGeometryPoints.length >= 2) {
+    map.fitBounds(L.latLngBounds(routeGeometryPoints), {
+      padding: [56, 56],
+      maxZoom: 15,
+    });
+
+    try {
+      map.panInsideBounds(L.latLngBounds(VIETNAM_MAP_BOUNDS.southWest, VIETNAM_MAP_BOUNDS.northEast), {
+        animate: false,
+      });
+    } catch (error) {}
+
+    return;
+  }
+
+  if (!markerDisplayState) return;
   const focusPoints = buildViewportFocusPoints(markerDisplayState);
   if (!focusPoints.length) return;
 
@@ -1239,7 +1261,7 @@ function applyRouteFocus(routeModel, focusedTimelineIndex = null) {
     );
     updateRoutePolylines(targetTimelineStep.stepIndex);
 
-    fitMarkerViewport(leafletMap, displayState);
+    fitMarkerViewport(leafletMap, displayState, routeModel.manager.model.routeGeometry);
   };
 
   if (destinationMarker) {
@@ -1293,7 +1315,7 @@ function applyRouteFocus(routeModel, focusedTimelineIndex = null) {
               truckMarker.setLatLng([displayState.truckDisplayPoint.lat, displayState.truckDisplayPoint.lng]);
             }
             updateRoutePolylines(targetTimelineStep.stepIndex);
-            fitMarkerViewport(leafletMap, displayState);
+            fitMarkerViewport(leafletMap, displayState, routeModel.manager.model.routeGeometry);
           },
           onDone: () => {
             currentRouteModel.vehicleRouteIndex = markerState.retreatRouteIndex;
@@ -1396,7 +1418,7 @@ async function renderSegmentedJourney(journey, preparedRoute = null) {
   }).addTo(leafletMap);
 
   checkpointMarkers = manager.timelineSteps
-    .filter((step) => step.phase !== 'order_created' && step.phase !== 'delivered')
+    .filter((step) => step.hasRealPoint && step.point && step.phase !== 'order_created' && step.phase !== 'delivered')
     .map((step, visualIndex) => {
       const timelineIndex = manager.timelineSteps.findIndex((entry) => entry.stepIndex === step.stepIndex);
       const marker = L.marker([step.point.lat, step.point.lng], {
@@ -1451,7 +1473,7 @@ function fitSegmentedJourney(map) {
     recipientDisplayPoint: isPickingPhase ? null : markerState.recipientDisplayPoint,
     originDisplayPoint: isDeliveryPhase ? null : currentRouteModel.originPoint,
     hasVisualSeparation: markerState.hasVisualSeparation,
-  });
+  }, currentRouteModel.manager.model.routeGeometry);
 }
 
 async function renderRoadJourneyMap(result) {
