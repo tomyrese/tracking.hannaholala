@@ -7,11 +7,16 @@ function pickCoordinate(value, fallback = null) {
   return Number.isFinite(number) ? number : fallback;
 }
 
+function isPointInVietnam(lat, lng) {
+  return lat >= 8.18 && lat <= 23.39 && lng >= 102.14 && lng <= 109.46;
+}
+
 function readLocationPoint(location) {
   if (!location) return null;
   const lat = pickCoordinate(location.lat);
   const lng = pickCoordinate(location.long, pickCoordinate(location.lng));
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (!isPointInVietnam(lat, lng)) return null;
   return { lat, lng };
 }
 
@@ -20,6 +25,7 @@ function readEventPoint(event) {
   const lat = pickCoordinate(event.lat);
   const lng = pickCoordinate(event.lng);
   if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (!isPointInVietnam(lat, lng)) return null;
   return { lat, lng };
 }
 
@@ -119,9 +125,18 @@ export class TrackingRouteManager {
       readLocationPoint(this.result?.from_location) ||
       readEventPoint(rawEvents.at(-1)) ||
       this.fallbackOrigin;
+    const deliveredEvent = rawEvents.find(e => {
+      const text = String(e?.title || '').toLowerCase();
+      return text.includes('giao thanh cong') || text.includes('giao hang thanh cong') || text.includes('delivered');
+    });
+    const expectedEvent = rawEvents.find(e => {
+      const text = String(e?.title || '').toLowerCase();
+      return text.includes('du kien giao');
+    });
     const destinationPoint =
       readLocationPoint(this.result?.to_location) ||
-      readEventPoint(rawEvents[0]) ||
+      readEventPoint(deliveredEvent) ||
+      readEventPoint(expectedEvent) ||
       this.fallbackDestination;
 
     const selectedByPhase = new Map();

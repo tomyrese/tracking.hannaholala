@@ -384,3 +384,20 @@
 - Increased the default overlap threshold and offset in `src/mapViewport.mjs` to ensure the icons are separated by a visually distinct distance on the Leaflet map.
 - Added a `test` script inside `package.json` to allow running the test suite directly via `npm test` without relying on custom IDE/Google MCP extensions, ensuring deterministic local test execution.
 
+## Recent Updates (GPS Boundary Validation and Destination Fallback Fix)
+### Modified files
+- [TrackingRouteManager.mjs](file:///d:/Work/HOtracking/src/TrackingRouteManager.mjs)
+- [history.md](file:///d:/Work/HOtracking/history.md)
+
+### Commands executed
+- `npm test`
+- `git config user.name "Wuys"`
+- `git config user.email "phuquynguyen458@gmail.com"`
+- `git add src/TrackingRouteManager.mjs history.md`
+- `git commit -m "feat: validate GPS coordinates to be inside Vietnam and fix destination point fallback logic"`
+- `git push origin main`
+
+### Fixes applied
+- Implemented Vietnam coordinate boundary validation inside `readLocationPoint` and `readEventPoint` in `src/TrackingRouteManager.mjs`. This prevents faulty coordinates (e.g., driver scan logs with negative longitudes like `-27`) from being parsed as valid map coordinates.
+- Fixed the destination point resolution logic. Previously, when the delivery coordinate (`to_location`) was null/invalid, the destination collapsed to the current GPS position (`rawEvents[0]`), which made the route end prematurely at the truck and misplaced the recipient icon. Now, if the delivery coordinates are missing/invalid, the destination correctly falls back to either the coordinates of a delivered event, an expected delivery event, or the default fallback destination (HCMC center), preserving the full route line.
+
