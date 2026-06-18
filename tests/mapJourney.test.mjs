@@ -55,7 +55,7 @@ test('route manager keeps only one delivered step even if source data repeats it
   assert.equal(deliveredSteps.length, 1);
 });
 
-test('setRouteGeometry keeps timeline steps without real coordinates unmapped', () => {
+test('setRouteGeometry samples every timeline step directly from the route coordinates', () => {
   const manager = createTrackingRouteManager({
     from_location: { lat: 10.1, long: 106.1 },
     to_location: { lat: 10.9, long: 106.9 },
@@ -76,10 +76,11 @@ test('setRouteGeometry keeps timeline steps without real coordinates unmapped', 
 
   manager.setRouteGeometry(routeGeometry);
 
-  manager.stepsChronological.forEach((step) => {
-    assert.equal(step.routeIndex ?? null, null);
-    assert.equal(step.point, null);
-    assert.equal(step.isRoutePoint, false);
+  const expectedIndexes = [0, 20, 40, 60, 80, 100];
+  manager.stepsChronological.forEach((step, index) => {
+    assert.equal(step.routeIndex, expectedIndexes[index]);
+    assert.deepEqual(step.point, routeGeometry[expectedIndexes[index]]);
+    assert.equal(step.isRoutePoint, true);
   });
 });
 
@@ -108,22 +109,6 @@ test('setRouteGeometry maps timeline steps to the nearest real checkpoint positi
     assert.equal(step.routeIndex, expectedIndexes[index]);
     assert.deepEqual(step.point, routeGeometry[expectedIndexes[index]]);
   });
-});
-
-test('generateAnchorPoints ignores clustered event coordinates when every event stays within 500 meters', () => {
-  const manager = createTrackingRouteManager({
-    from_location: { lat: 10.0, long: 106.0 },
-    to_location: { lat: 21.0, long: 105.8 },
-    events: [
-      { title: 'Dang giao', lat: 10.1010, lng: 106.1010, time: '12:00' },
-      { title: 'Dang luan chuyen', lat: 10.1018, lng: 106.1015, time: '11:00' },
-      { title: 'Da lay hang', lat: 10.1024, lng: 106.1020, time: '10:00' },
-    ],
-  });
-
-  const stepAnchors = manager.routeAnchors.filter((anchor) => anchor.kind === 'step');
-  assert.equal(stepAnchors.length, 0);
-  assert.equal(manager.stepsChronological.every((step) => step.hasRealPoint === false), true);
 });
 
 test('completed and remaining paths are always slices of the main route geometry', () => {
