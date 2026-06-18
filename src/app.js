@@ -691,6 +691,7 @@ let leafletMap = null;
 let truckMarker = null;
 let destinationMarker = null;
 let originMarker = null;
+let endNodeMarker = null;
 let checkpointMarkers = [];
 let segmentPolylines = [];
 let currentRouteModel = null;
@@ -716,6 +717,7 @@ function hideMinimap() {
   truckMarker = null;
   destinationMarker = null;
   originMarker = null;
+  endNodeMarker = null;
   checkpointMarkers = [];
   segmentPolylines = [];
   currentRouteModel = null;
@@ -1257,7 +1259,7 @@ function setActiveTimelineItem(index) {
 
 function createEmojiMarkerIcon({ emoji, className }) {
   return L.divIcon({
-    html: `<span class="map-emoji-marker ${className}">${emoji}</span>`,
+    html: `<span class="map-emoji-marker ${className}"><span class="map-emoji-marker__glyph">${emoji}</span></span>`,
     className: 'map-emoji-marker-wrap',
     iconSize: [42, 42],
     iconAnchor: [21, 21],
@@ -1273,6 +1275,28 @@ function createDeliveredRecipientIcon() {
     iconAnchor: [27, 21],
     popupAnchor: [0, -18],
   });
+}
+
+function createLogisticsNodeIcon(kind = 'start') {
+  return L.divIcon({
+    html: `<span class="map-route-node map-route-node--${kind}"></span>`,
+    className: 'map-route-node-wrap',
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+    popupAnchor: [0, -10],
+  });
+}
+
+function setVehicleMarkerAngle(marker, angle) {
+  const glyph = marker?.getElement()?.querySelector('.map-emoji-marker__glyph');
+  if (!glyph) return;
+  glyph.style.transform = `rotate(${angle}deg)`;
+}
+
+function getBearing(fromPoint, toPoint) {
+  if (!fromPoint || !toPoint) return 0;
+  const angle = Math.atan2(toPoint.lng - fromPoint.lng, toPoint.lat - fromPoint.lat);
+  return ((angle * 180) / Math.PI) - 90;
 }
 
 function createCheckpointIcon(status = 'upcoming') {
@@ -1410,16 +1434,36 @@ function updateCheckpointMarkerStates() {
 
 function updateRoutePolylines(stepIndex) {
   if (!currentRouteModel?.manager) return;
-  const routePaths = currentRouteModel.manager.updateCompletedPath(stepIndex);
+  const routePaths = currentRouteModel.manager.updateCompletedPath(stepIndex, currentRouteModel.vehicleRouteIndex);
 
   if (fullRoutePolyline) fullRoutePolyline.setLatLngs(routePaths.full);
   if (completedRoutePolyline) completedRoutePolyline.setLatLngs(routePaths.completed);
   if (remainingRoutePolyline) remainingRoutePolyline.setLatLngs(routePaths.remaining);
 }
 
-function animateMarkerTo(marker, targetPoint, options = {}) {
-  const { duration = 1200, onFrame = null, onDone = null } = options;
-  if (!marker || !targetPoint) {
+function pointFromLatLng(latLng) {
+  return latLng ? { lat: latLng.lat, lng: latLng.lng } : null;
+}
+
+function findNearestRouteIndex(routePoints, point) {
+  if (!Array.isArray(routePoints) || !routePoints.length || !point) return 0;
+  let bestIndex = 0;
+  let bestDistance = Infinity;
+
+  routePoints.forEach((candidate, index) => {
+    const distance = Math.hypot(candidate.lat - point.lat, candidate.lng - point.lng);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIndex = index;
+    }
+  });
+
+  return bestIndex;
+}
+
+function animateMarkerAlongPath(marker, pathPoints, options = {}) {
+  const { duration = 1200, onFrame = null, onDone = null, angleOffset = 0 } = options;
+  if (!marker || !Array.isArray(pathPoints) || pathPoints.length < 2) {
     onDone?.();
     return;
   }
@@ -1429,20 +1473,45 @@ function animateMarkerTo(marker, targetPoint, options = {}) {
     animFrameId = null;
   }
 
-  const start = marker.getLatLng();
-  const startLat = start.lat;
-  const startLng = start.lng;
-  const targetLat = targetPoint.lat;
-  const targetLng = targetPoint.lng;
+  const segments = [];
+  let totalDistance = 0;
+  for (let index = 0; index < pathPoints.length - 1; index += 1) {
+    const from = pathPoints[index];
+    const to = pathPoints[index + 1];
+    const distance = Math.hypot(to.lat - from.lat, to.lng - from.lng);
+    segments.push({ from, to, distance, startDistance: totalDistance });
+    totalDistance += distance;
+  }
+
+  if (!totalDistance) {
+    marker.setLatLng([pathPoints.at(-1).lat, pathPoints.at(-1).lng]);
+    onDone?.();
+    return;
+  }
+
   const startedAt = performance.now();
 
   const tick = (now) => {
     const progress = Math.min(1, (now - startedAt) / duration);
     const eased = 1 - ((1 - progress) ** 3);
-    const nextLat = startLat + ((targetLat - startLat) * eased);
-    const nextLng = startLng + ((targetLng - startLng) * eased);
+    const traveledDistance = totalDistance * eased;
+    let activeSegment = segments.at(-1);
+
+    for (const segment of segments) {
+      if (traveledDistance <= segment.startDistance + segment.distance) {
+        activeSegment = segment;
+        break;
+      }
+    }
+
+    const segmentDistance = Math.max(activeSegment.distance, 0.0000001);
+    const localProgress = Math.min(1, Math.max(0, (traveledDistance - activeSegment.startDistance) / segmentDistance));
+    const nextLat = activeSegment.from.lat + ((activeSegment.to.lat - activeSegment.from.lat) * localProgress);
+    const nextLng = activeSegment.from.lng + ((activeSegment.to.lng - activeSegment.from.lng) * localProgress);
+    const currentPoint = { lat: nextLat, lng: nextLng };
     marker.setLatLng([nextLat, nextLng]);
-    onFrame?.({ lat: nextLat, lng: nextLng }, progress);
+    setVehicleMarkerAngle(marker, getBearing(activeSegment.from, activeSegment.to) + angleOffset);
+    onFrame?.(currentPoint, progress, activeSegment);
 
     if (progress < 1) {
       animFrameId = requestAnimationFrame(tick);
@@ -1450,7 +1519,7 @@ function animateMarkerTo(marker, targetPoint, options = {}) {
     }
 
     animFrameId = null;
-    onDone?.();
+    onDone?.(pointFromLatLng(marker.getLatLng()));
   };
 
   animFrameId = requestAnimationFrame(tick);
@@ -1464,15 +1533,16 @@ function applyRouteFocus(routeModel, focusedTimelineIndex = null) {
   if (!targetTimelineStep) return;
 
   const moveState = routeModel.manager.moveVehicleToStep(targetTimelineStep.stepIndex);
-  const markerState = routeModel.manager.updateMarkerStates(targetTimelineStep.stepIndex);
+  const markerState = routeModel.manager.updateMarkerStates(targetTimelineStep.stepIndex, moveState.routeIndex);
+  const startRouteIndex = routeModel.vehicleRouteIndex ?? routeModel.manager.model.originRouteIndex;
+  const targetPath = routeModel.manager.getRouteSlice(startRouteIndex, moveState.routeIndex);
 
   updateTimelineState(targetTimelineStep.stepIndex);
   updateCheckpointMarkerStates();
-  updateRoutePolylines(targetTimelineStep.stepIndex);
 
   const applyDisplayState = (animatedPoint = null) => {
     const displayState = buildMarkerDisplayState(
-      animatedPoint || moveState.truckPoint,
+      animatedPoint || markerState.truckPoint,
       markerState.recipientPoint,
       { delivered: markerState.delivered },
     );
@@ -1483,6 +1553,12 @@ function applyRouteFocus(routeModel, focusedTimelineIndex = null) {
         displayState.recipientDisplayPoint.lng,
       ]);
     }
+
+    currentRouteModel.vehicleRouteIndex = findNearestRouteIndex(
+      routeModel.manager.model.routeGeometry,
+      animatedPoint || markerState.truckPoint,
+    );
+    updateRoutePolylines(targetTimelineStep.stepIndex);
 
     fitMarkerViewport(leafletMap, {
       ...displayState,
@@ -1503,11 +1579,43 @@ function applyRouteFocus(routeModel, focusedTimelineIndex = null) {
       emoji: markerState.truckEmoji,
       className: 'map-emoji-marker--truck',
     }));
-
-    animateMarkerTo(truckMarker, markerState.truckDisplayPoint, {
+    animateMarkerAlongPath(truckMarker, targetPath, {
       duration: 1200,
       onFrame: (point) => applyDisplayState(point),
-      onDone: () => applyDisplayState(markerState.truckDisplayPoint),
+      onDone: () => {
+        currentRouteModel.vehicleRouteIndex = moveState.routeIndex;
+        applyDisplayState(markerState.truckPoint);
+
+        if (!markerState.delivered) return;
+
+        destinationMarker?.setIcon(createDeliveredRecipientIcon());
+        const retreatPath = routeModel.manager.getRouteSlice(moveState.routeIndex, markerState.retreatRouteIndex);
+        const retreatState = routeModel.manager.updateMarkerStates(targetTimelineStep.stepIndex, markerState.retreatRouteIndex);
+
+        animateMarkerAlongPath(truckMarker, retreatPath, {
+          duration: 850,
+          angleOffset: 180,
+          onFrame: (point) => {
+            currentRouteModel.vehicleRouteIndex = findNearestRouteIndex(
+              routeModel.manager.model.routeGeometry,
+              point,
+            );
+            const displayState = buildMarkerDisplayState(point, retreatState.recipientPoint, { delivered: true });
+            if (destinationMarker && displayState.recipientDisplayPoint) {
+              destinationMarker.setLatLng([displayState.recipientDisplayPoint.lat, displayState.recipientDisplayPoint.lng]);
+            }
+            updateRoutePolylines(targetTimelineStep.stepIndex);
+            fitMarkerViewport(leafletMap, {
+              ...displayState,
+              originDisplayPoint: routeModel.originPoint,
+            });
+          },
+          onDone: () => {
+            currentRouteModel.vehicleRouteIndex = markerState.retreatRouteIndex;
+            updateRoutePolylines(targetTimelineStep.stepIndex);
+          },
+        });
+      },
     });
   }
 
@@ -1549,26 +1657,8 @@ async function renderSegmentedJourney(journey) {
   currentRouteModel.manager = manager;
   currentRouteModel.timelineSteps = manager.timelineSteps;
   currentRouteModel.originPoint = manager.model.origin;
-
-  const routeSegments = [];
-  for (let index = 0; index < manager.model.routePoints.length - 1; index += 1) {
-    const from = manager.model.routePoints[index];
-    const to = manager.model.routePoints[index + 1];
-    const routePoints = snapRouteEndpoints(
-      await fetchRoadRoute(fetch, from, to),
-      from,
-      to,
-    );
-    routeSegments.push(...routePoints.map((point) => Array.isArray(point) ? point : [point.lat, point.lng]));
-  }
-
-  const dedupedRoute = [];
-  for (const point of routeSegments) {
-    const last = dedupedRoute[dedupedRoute.length - 1];
-    if (!last || last[0] !== point[0] || last[1] !== point[1]) {
-      dedupedRoute.push(point);
-    }
-  }
+  currentRouteModel.vehicleRouteIndex = manager.getRouteIndexForStep(manager.activeStepIndex);
+  const dedupedRoute = manager.model.routeGeometry.map((point) => [point.lat, point.lng]);
 
   fullRoutePolyline = L.polyline(dedupedRoute, {
     ...getRouteLineStyle('base'),
@@ -1619,11 +1709,21 @@ async function renderSegmentedJourney(journey) {
       destinationMarker.openPopup();
     });
   }
+
+  if (deliveredStep && endNodeMarker) {
+    endNodeMarker.on('click', () => {
+      focusTimelineCheckpoint(findTimelineIndexForStep(deliveredStep.stepIndex));
+      endNodeMarker.openPopup();
+    });
+  }
 }
 
 function fitSegmentedJourney(map) {
   if (!map || !currentRouteModel?.manager) return;
-  const markerState = currentRouteModel.manager.updateMarkerStates(currentRouteModel.manager.activeStepIndex);
+  const markerState = currentRouteModel.manager.updateMarkerStates(
+    currentRouteModel.manager.activeStepIndex,
+    currentRouteModel.vehicleRouteIndex,
+  );
   fitMarkerViewport(map, {
     truckDisplayPoint: markerState.truckDisplayPoint,
     recipientDisplayPoint: markerState.recipientDisplayPoint,
@@ -1695,21 +1795,27 @@ async function renderRoadJourneyMap(result) {
   const markerDisplayState = buildMarkerDisplayState(journey.current, journey.destination, { delivered: isDeliveredJourney });
 
   originMarker = L.marker([journey.origin.lat, journey.origin.lng], {
-    icon: createEmojiMarkerIcon({ emoji: '🚚📦', className: 'map-emoji-marker--truck map-emoji-marker--origin' }),
-    zIndexOffset: 200,
+    icon: createLogisticsNodeIcon('start'),
+    zIndexOffset: 1300,
   }).addTo(leafletMap);
   originMarker.bindPopup('<b>Kho gửi hàng</b>');
 
+  endNodeMarker = L.marker([journey.destination.lat, journey.destination.lng], {
+    icon: createLogisticsNodeIcon('end'),
+    zIndexOffset: 1400,
+  }).addTo(leafletMap);
+  endNodeMarker.bindPopup('<b>Điểm giao hàng</b>');
+
   destinationMarker = L.marker([markerDisplayState.recipientDisplayPoint.lat, markerDisplayState.recipientDisplayPoint.lng], {
     icon: isDeliveredJourney ? deliveredRecipientIcon : recipientIcon,
-    zIndexOffset: 500,
+    zIndexOffset: 1450,
   }).addTo(leafletMap);
   destinationMarker.bindPopup(isDeliveredJourney ? '<b>✓ Người nhận đã nhận hàng</b>' : '<b>Vị trí người nhận</b>');
 
   truckMarker = markerDisplayState.truckDisplayPoint
     ? L.marker([markerDisplayState.truckDisplayPoint.lat, markerDisplayState.truckDisplayPoint.lng], {
         icon: isDeliveredJourney ? deliveredTruckIcon : truckIcon,
-        zIndexOffset: 1000,
+        zIndexOffset: 1350,
       }).addTo(leafletMap)
     : null;
 

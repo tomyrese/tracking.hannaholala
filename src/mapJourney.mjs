@@ -24,8 +24,8 @@ export function buildMapJourney(result, fallbackOrigin, fallbackDestination) {
   const pathPoints = model.routePoints.map((point) => {
     if (point.kind === 'origin') {
       return {
-        lat: point.lat,
-        lng: point.lng,
+        lat: point.point.lat,
+        lng: point.point.lng,
         kind: 'origin',
         timelineIndex: null,
         title: 'Diem gui hang',
@@ -34,8 +34,8 @@ export function buildMapJourney(result, fallbackOrigin, fallbackDestination) {
 
     if (point.kind === 'destination') {
       return {
-        lat: point.lat,
-        lng: point.lng,
+        lat: point.point.lat,
+        lng: point.point.lng,
         kind: 'destination',
         timelineIndex: null,
         title: 'Diem nhan hang',
@@ -44,8 +44,8 @@ export function buildMapJourney(result, fallbackOrigin, fallbackDestination) {
 
     const checkpoint = checkpointByStepIndex.get(point.stepIndex);
     return {
-      lat: point.lat,
-      lng: point.lng,
+      lat: point.point.lat,
+      lng: point.point.lng,
       kind: 'event',
       timelineIndex: checkpoint?.timelineIndex ?? null,
       title: checkpoint?.title || 'Cap nhat hanh trinh',

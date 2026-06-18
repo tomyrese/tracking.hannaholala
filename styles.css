@@ -1129,12 +1129,17 @@ h1 {
   background: rgba(255, 255, 255, 0.94);
 }
 
-.map-emoji-marker--truck {
-  background: linear-gradient(180deg, #2d2d2d 0%, #111 100%);
+.map-emoji-marker__glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center;
+  transition: transform 180ms ease;
+  will-change: transform;
 }
 
-.map-emoji-marker--origin {
-  background: linear-gradient(180deg, #4a403b 0%, #241d1a 100%);
+.map-emoji-marker--truck {
+  background: linear-gradient(180deg, #2d2d2d 0%, #111 100%);
 }
 
 .map-emoji-marker--recipient {
@@ -1154,6 +1159,28 @@ h1 {
   justify-content: center;
   gap: 2px;
   white-space: nowrap;
+}
+
+.map-route-node-wrap {
+  background: transparent;
+  border: 0;
+}
+
+.map-route-node {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.96);
+  box-shadow: 0 8px 14px rgba(45, 34, 30, 0.18);
+}
+
+.map-route-node--start {
+  background: #7c5f53;
+}
+
+.map-route-node--end {
+  background: #2f9e73;
 }
 
 .map-checkpoint-dot {

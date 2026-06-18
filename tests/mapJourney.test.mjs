@@ -24,6 +24,7 @@ test('buildMapJourney keeps origin and destination fixed while current follows t
   assert.equal(journey.checkpoints.length, 3);
   assert.equal(journey.pathPoints[0].kind, 'origin');
   assert.equal(journey.pathPoints.at(-1).kind, 'destination');
+  assert.equal(journey.routePaths.full.length > journey.pathPoints.length, true);
 });
 
 test('route manager creates virtual points so text-only interactive steps stay clickable', () => {
@@ -75,4 +76,27 @@ test('completed and remaining paths are both preserved instead of removing the o
   assert.equal(pathState.full.length >= 4, true);
   assert.equal(pathState.completed.length >= 2, true);
   assert.equal(pathState.remaining.length >= 2, true);
+});
+
+test('route manager generates a curved corridor route instead of a single straight segment', () => {
+  const manager = createTrackingRouteManager({
+    from_location: { lat: 10.1, long: 106.1 },
+    to_location: { lat: 10.9, long: 106.9 },
+    events: [
+      { title: 'Dang giao', lat: 10.7, lng: 106.7 },
+      { title: 'Da lay hang', lat: 10.2, lng: 106.2 },
+    ],
+  }, {
+    routeVariantSeed: 'stable-test-seed',
+  });
+
+  const anchors = manager.model.routePoints.map((entry) => entry.point);
+  const routeGeometry = manager.model.routeGeometry;
+  assert.equal(routeGeometry.length > anchors.length, true);
+  const midpoint = routeGeometry[Math.floor(routeGeometry.length / 2)];
+  const straightMidpoint = {
+    lat: (manager.model.origin.lat + manager.model.destination.lat) / 2,
+    lng: (manager.model.origin.lng + manager.model.destination.lng) / 2,
+  };
+  assert.notDeepEqual(midpoint, straightMidpoint);
 });
