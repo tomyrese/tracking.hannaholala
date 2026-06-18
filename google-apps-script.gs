@@ -118,15 +118,26 @@ function checkIfReviewed(trackingCode) {
   const data = sheet.getDataRange().getValues();
   if (data.length <= 1) return null; // Chỉ có dòng tiêu đề
 
+  const headers = data[0].map(function(h) { return String(h).trim().toLowerCase(); });
+  
+  // Tìm chỉ số các cột dựa theo tên tiêu đề (chấp nhận cả tiếng Anh và tiếng Việt)
+  const trackingCodeIdx = headers.indexOf("mã đơn nội bộ") !== -1 ? headers.indexOf("mã đơn nội bộ") : headers.indexOf("tracking_code");
+  const ratingIdx = headers.indexOf("sao") !== -1 ? headers.indexOf("sao") : headers.indexOf("rating");
+  const noteIdx = headers.indexOf("ghi chú") !== -1 ? headers.indexOf("ghi chú") : headers.indexOf("note");
+
+  // Fallback về chỉ số mặc định nếu không tìm thấy tiêu đề
+  const colTracking = trackingCodeIdx !== -1 ? trackingCodeIdx : 1;
+  const colRating = ratingIdx !== -1 ? ratingIdx : 5;
+  const colNote = noteIdx !== -1 ? noteIdx : 6;
+
   const cleanCode = String(trackingCode).trim().toUpperCase();
 
-  // Cột 1 là Thời gian, Cột 2 là Mã đơn nội bộ (chỉ số mảng là 1)
   for (let i = 1; i < data.length; i++) {
-    const cellValue = String(data[i][1]).trim().toUpperCase();
+    const cellValue = String(data[i][colTracking]).trim().toUpperCase();
     if (cellValue === cleanCode) {
       return {
-        rating: Number(data[i][5]),
-        note: String(data[i][6] || "")
+        rating: Number(data[i][colRating]),
+        note: String(data[i][colNote] || "")
       };
     }
   }
