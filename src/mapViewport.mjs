@@ -83,27 +83,7 @@ export function buildMarkerDisplayState(truckPoint, recipientPoint) {
     }
   }
 
-  // 2. Check origin-truck overlap
-  if (originDisplay && truckDisplay) {
-    const nearOrigin =
-      Math.abs(truckDisplay.lat - originDisplay.lat) <= overlapThreshold &&
-      Math.abs(truckDisplay.lng - originDisplay.lng) <= overlapThreshold;
-
-    if (nearOrigin) {
-      const effectiveOffset = overlapOffset;
-      if (Array.isArray(routeGeometry) && vehicleRouteIndex !== null) {
-        const shifted = shiftPointAlongRoute(routeGeometry, vehicleRouteIndex, effectiveOffset, 'forward');
-        if (shifted) {
-          truckDisplay = shifted;
-        } else {
-          truckDisplay.lng = truckPoint.lng + effectiveOffset;
-        }
-      } else {
-        truckDisplay.lng = truckPoint.lng + effectiveOffset;
-      }
-      hasVisualSeparation = true;
-    }
-  }
+  // 2. Check origin-truck overlap (removed to allow the truck to stand directly on the warehouse dot)
 
   const result = {
     truckDisplayPoint: truckDisplay,

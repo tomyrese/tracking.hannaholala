@@ -1247,11 +1247,11 @@ function createRecipientMarkerIcon({ delivered = false } = {}) {
   return L.divIcon({
     html: `
       <span class="map-marker map-marker--recipient" style="width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; position: relative;">
-        <!-- The dot in the background (centered) -->
-        <span class="map-checkpoint-dot ${delivered ? 'map-checkpoint-dot--completed' : 'map-checkpoint-dot--upcoming'}" style="position: absolute; bottom: 11px; left: 11px; width: 10px; height: 10px; z-index: 1;"></span>
+        <!-- The dot in the background (centered at the needle tip location bottom-left) -->
+        <span class="map-checkpoint-dot ${delivered ? 'map-checkpoint-dot--completed' : 'map-checkpoint-dot--upcoming'}" style="position: absolute; bottom: 2px; left: 2px; width: 10px; height: 10px; z-index: 1;"></span>
         
         <!-- The emoji pin on top of the dot -->
-        <span class="map-marker__glyph" style="font-size: 24px; position: absolute; z-index: 2; line-height: 1; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.25));">📍</span>
+        <span class="map-marker__glyph" style="font-size: 24px; position: absolute; z-index: 2; line-height: 1; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.25)); top: 0px; left: 4px;">📍</span>
         
         ${delivered ? '<span class="map-marker__badge" style="top: -2px; right: -2px; width: 15px; height: 15px; font-size: 9px; display: flex; align-items: center; justify-content: center; z-index: 3;">✓</span>' : ''}
         <span class="receiver-marker__box" style="display: none !important;"></span>
@@ -1259,8 +1259,8 @@ function createRecipientMarkerIcon({ delivered = false } = {}) {
     `,
     className: 'map-marker-wrap',
     iconSize: [32, 32],
-    iconAnchor: [16, 16],
-    popupAnchor: [0, -20],
+    iconAnchor: [7, 25],
+    popupAnchor: [10, -25],
   });
 }
 
