@@ -29,3 +29,9 @@
   from = "/api/bnb-products"
   to = "/.netlify/functions/bnb-products"
   status = 200
+
+[[redirects]]
+  from = "/api/route"
+  to = "/.netlify/functions/route"
+  status = 200
+

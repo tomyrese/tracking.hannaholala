@@ -240,10 +240,16 @@ export async function buildRoute(fetchImpl, points, fallbackRoute = []) {
   }
 
   const encodedPoints = routingPoints.map((point) => `${point.lng},${point.lat}`).join(';');
-  const urls = [
-    `https://routing.openstreetmap.de/routed-car/route/v1/driving/${encodedPoints}?overview=full&geometries=geojson`,
-    `https://router.project-osrm.org/route/v1/driving/${encodedPoints}?overview=full&geometries=geojson`
-  ];
+  
+  const isBrowser = typeof window !== 'undefined' && typeof window.location !== 'undefined';
+  const origin = isBrowser ? (window.location.protocol === 'file:' ? 'http://localhost:3000' : window.location.origin) : '';
+
+  const urls = [];
+  if (isBrowser) {
+    urls.push(`${origin}/api/route?points=${encodedPoints}`);
+  }
+  urls.push(`https://routing.openstreetmap.de/routed-car/route/v1/driving/${encodedPoints}?overview=full&geometries=geojson`);
+  urls.push(`https://router.project-osrm.org/route/v1/driving/${encodedPoints}?overview=full&geometries=geojson`);
 
   for (const url of urls) {
     try {
