@@ -1228,10 +1228,10 @@ function setActiveTimelineItem(index) {
   });
 }
 
-function createVehicleMarkerIcon({ emoji }) {
+function createVehicleMarkerIcon({ emoji, hidden = false }) {
   return L.divIcon({
     html: `
-      <span class="map-marker map-marker--vehicle">
+      <span class="map-marker map-marker--vehicle" style="${hidden ? 'display: none !important;' : ''}">
         <span class="map-marker__glyph">🚚</span>
         <span class="map-emoji-marker__direction" style="display: none !important;"></span>
       </span>
@@ -1244,14 +1244,18 @@ function createVehicleMarkerIcon({ emoji }) {
 }
 
 function createRecipientMarkerIcon({ delivered = false } = {}) {
-  const pinColor = delivered ? '#248f67' : '#2196f3';
+  const pinColor = '#2196f3';
   return L.divIcon({
     html: `
       <span class="map-marker map-marker--recipient" style="width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; position: relative;">
-        <svg viewBox="0 0 24 24" fill="${pinColor}" style="width: 32px; height: 32px; display: block; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.25));">
+        <!-- The dot in the background (centered at bottom tip) -->
+        <span class="map-checkpoint-dot ${delivered ? 'map-checkpoint-dot--completed' : 'map-checkpoint-dot--upcoming'}" style="position: absolute; bottom: -5px; left: 11px; width: 10px; height: 10px; z-index: 1;"></span>
+        
+        <!-- The SVG pin on top of the dot -->
+        <svg viewBox="0 0 24 24" fill="${pinColor}" style="position: absolute; top: 0; left: 0; width: 32px; height: 32px; display: block; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.25)); z-index: 2;">
           <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
         </svg>
-        ${delivered ? '<span class="map-marker__badge" style="top: -2px; right: -2px; width: 15px; height: 15px; font-size: 9px; display: flex; align-items: center; justify-content: center;">✓</span>' : ''}
+        ${delivered ? '<span class="map-marker__badge" style="top: -2px; right: -2px; width: 15px; height: 15px; font-size: 9px; display: flex; align-items: center; justify-content: center; z-index: 3;">✓</span>' : ''}
         <span class="receiver-marker__box" style="display: none !important;"></span>
       </span>
     `,
@@ -1668,8 +1672,16 @@ function applyRouteFocus(routeModel, focusedTimelineIndex = null) {
   }
 
   if (truckMarker) {
+    const truckEl = truckMarker.getElement();
+    if (truckEl) {
+      const vehicleSpan = truckEl.querySelector('.map-marker--vehicle');
+      if (vehicleSpan) {
+        vehicleSpan.style.setProperty('display', 'block', 'important');
+      }
+    }
     truckMarker.setIcon(createVehicleMarkerIcon({
       emoji: markerState.truckEmoji,
+      hidden: false,
     }));
     animateMarkerAlongPath(truckMarker, targetPath, {
       duration: 1200,
@@ -1714,6 +1726,14 @@ function applyRouteFocus(routeModel, focusedTimelineIndex = null) {
           onDone: () => {
             currentRouteModel.vehicleRouteIndex = markerState.retreatRouteIndex;
             updateRoutePolylines(targetTimelineStep.stepIndex);
+            
+            const finalTruckEl = truckMarker?.getElement();
+            if (finalTruckEl) {
+              const vehicleSpan = finalTruckEl.querySelector('.map-marker--vehicle');
+              if (vehicleSpan) {
+                vehicleSpan.style.setProperty('display', 'none', 'important');
+              }
+            }
           },
         });
       },
@@ -1919,7 +1939,7 @@ async function renderRoadJourneyMap(result) {
   }).addTo(leafletMap);
 
   const truckIcon = createVehicleMarkerIcon({ emoji: '🚚📦' });
-  const deliveredTruckIcon = createVehicleMarkerIcon({ emoji: '🚚' });
+  const deliveredTruckIcon = createVehicleMarkerIcon({ emoji: '🚚', hidden: true });
   const recipientIcon = createRecipientMarkerIcon();
   const deliveredRecipientIcon = createRecipientMarkerIcon({ delivered: true });
   const isDeliveredJourney = isDeliveredResult(result, journey);
