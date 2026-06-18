@@ -97,7 +97,7 @@ export async function handleReviewRequest({
   const webAppUrl = env.GOOGLE_REVIEW_WEB_APP_URL || '';
   const secret = env.GOOGLE_REVIEW_SHARED_SECRET || '';
 
-  if (!webAppUrl) return buildConfigError();
+  if (!webAppUrl || webAppUrl === 'undefined' || webAppUrl === 'null') return buildConfigError();
 
   if (method === 'OPTIONS') {
     return {
