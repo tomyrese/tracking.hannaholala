@@ -419,6 +419,54 @@ function normalizeGhnResponse(data, carrier, code, lookupMode) {
   };
 }
 
+export function findCoordinatesByWardOrDistrict(orders, wardCode, districtId) {
+  if (!orders || !Array.isArray(orders)) return null;
+
+  if (wardCode) {
+    const codeStr = String(wardCode).trim();
+    if (codeStr) {
+      const match = orders.find((o) => {
+        const fromWard = o.from_ward_code ? String(o.from_ward_code).trim() : '';
+        const toWard = o.to_ward_code ? String(o.to_ward_code).trim() : '';
+        return (fromWard === codeStr && o.from_location?.lat) || (toWard === codeStr && o.to_location?.lat);
+      });
+      if (match) {
+        const loc = String(match.from_ward_code).trim() === codeStr ? match.from_location : match.to_location;
+        if (loc && loc.lat && (loc.long || loc.lng)) {
+          return {
+            lat: Number(loc.lat),
+            long: Number(loc.long || loc.lng),
+            lng: Number(loc.long || loc.lng),
+          };
+        }
+      }
+    }
+  }
+
+  if (districtId) {
+    const distNum = Number(districtId);
+    if (distNum) {
+      const match = orders.find((o) => {
+        const fromDist = o.from_district_id ? Number(o.from_district_id) : 0;
+        const toDist = o.to_district_id ? Number(o.to_district_id) : 0;
+        return (fromDist === distNum && o.from_location?.lat) || (toDist === distNum && o.to_location?.lat);
+      });
+      if (match) {
+        const loc = Number(match.from_district_id) === distNum ? match.from_location : match.to_location;
+        if (loc && loc.lat && (loc.long || loc.lng)) {
+          return {
+            lat: Number(loc.lat),
+            long: Number(loc.long || loc.lng),
+            lng: Number(loc.long || loc.lng),
+          };
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
 async function callGhnDetail(carrier, code, lookup) {
   const headers = buildGhnHeaders();
   if (!headers) {
@@ -430,6 +478,14 @@ async function callGhnDetail(carrier, code, lookup) {
         String(order.client_order_code || '').toUpperCase() === String(code || '').toUpperCase()
       );
       if (found) {
+        if (!found.from_location) {
+          const geo = findCoordinatesByWardOrDistrict(orders, found.from_ward_code, found.from_district_id);
+          if (geo) found.from_location = geo;
+        }
+        if (!found.to_location) {
+          const geo = findCoordinatesByWardOrDistrict(orders, found.to_ward_code, found.to_district_id);
+          if (geo) found.to_location = geo;
+        }
         return normalizeGhnResponse({ data: found }, carrier, code, lookup.mode);
       }
     } catch (err) {
@@ -458,6 +514,19 @@ async function callGhnDetail(carrier, code, lookup) {
       }
       if (!order.from_location && localOrder.from_location) {
         order.from_location = localOrder.from_location;
+      }
+    }
+    // Geocode fallback coordinates if they remain missing
+    if (!order.from_location) {
+      const geo = findCoordinatesByWardOrDistrict(orders, order.from_ward_code, order.from_district_id);
+      if (geo) {
+        order.from_location = geo;
+      }
+    }
+    if (!order.to_location) {
+      const geo = findCoordinatesByWardOrDistrict(orders, order.to_ward_code, order.to_district_id);
+      if (geo) {
+        order.to_location = geo;
       }
     }
   } catch (err) {
