@@ -422,47 +422,92 @@ function renderReviewForm(preparedResult, reviewData) {
   const trackingCode = reviewData.trackingCode || preparedResult.clientOrderCode || preparedResult.code;
 
   reviewPanel.innerHTML = `
-    <div class="review-panel__card">
-      <h3>Đánh giá dịch vụ giao hàng</h3>
-      <p>Mã đơn hàng: <strong>${trackingCode}</strong></p>
-      
+    <div class="review-panel__card" style="text-align: center; display: grid; justify-items: center; gap: 8px;">
+      <h3 style="font-size: 15px; margin: 0;">Đánh giá dịch vụ giao hàng</h3>
+      <p style="margin: 0; color: var(--muted); font-size: 12px;">Đơn hàng đã giao thành công. Hãy dành ít phút để đánh giá dịch vụ nhé!</p>
       ${reviewData.reviewed ? `
-        <div class="review-panel__badge">Đã đánh giá</div>
-        <p class="review-panel__message review-panel__message--success">Đơn hàng này đã được đánh giá.</p>
+        <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+          <span class="review-panel__badge" style="background: var(--green); color: var(--white); font-weight: 800; border: 0; display: inline-flex; align-items: center; justify-content: center; min-height: 28px; padding: 0 10px; border-radius: 999px; font-size: 11px;">✓ Đã đánh giá</span>
+        </div>
+        <button class="track-button btn-open-review-modal" style="min-height: 38px; padding: 0 16px; font-size: 12px; margin-top: 4px;">Xem đánh giá</button>
       ` : `
-        <form class="review-panel__form">
-          <div class="review-panel__field">
-            <span>Chọn mức độ hài lòng:</span>
-            <div class="review-rating">
-              <button type="button" class="review-rating__option" data-rating="5">★★★★★ 5 sao</button>
-              <button type="button" class="review-rating__option" data-rating="4">★★★★☆ 4 sao</button>
-              <button type="button" class="review-rating__option" data-rating="3">★★★☆☆ 3 sao</button>
-              <button type="button" class="review-rating__option" data-rating="2">★★☆☆☆ 2 sao</button>
-              <button type="button" class="review-rating__option" data-rating="1">★☆☆☆☆ 1 sao</button>
-              <button type="button" class="review-rating__option" data-rating="0">☆☆☆☆☆ 0 sao</button>
-            </div>
-          </div>
-          <div class="review-panel__field">
-            <span>Ghi chú đánh giá:</span>
-            <textarea placeholder="Nhập ý kiến đóng góp của bạn về dịch vụ giao hàng (tối đa 1000 ký tự)..." maxlength="1000"></textarea>
-          </div>
-          <p class="review-panel__message" style="display: none;"></p>
-          <button type="submit" class="track-button" style="width: 100%;" disabled>Gửi đánh giá</button>
-        </form>
+        <button class="track-button btn-open-review-modal" style="min-height: 38px; padding: 0 16px; font-size: 12px; margin-top: 4px; background: var(--rose); color: var(--white);">Đánh giá ngay</button>
       `}
     </div>
   `;
 
-  if (reviewData.reviewed) return;
+  const openBtn = reviewPanel.querySelector('.btn-open-review-modal');
+  if (openBtn) {
+    openBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      openReviewModal(preparedResult, reviewData);
+    });
+  }
+}
 
-  const form = reviewPanel.querySelector('.review-panel__form');
-  if (!form) return;
+function openReviewModal(preparedResult, reviewData) {
+  const modal = document.getElementById('review-modal');
+  const orderText = document.getElementById('review-modal-order-code-text');
+  const body = document.getElementById('review-modal-body');
+  if (!modal || !body || !orderText) return;
+
+  const trackingCode = reviewData.trackingCode || preparedResult.clientOrderCode || preparedResult.code;
+  orderText.innerHTML = `Mã đơn hàng: <strong>${trackingCode}</strong>`;
+
+  if (reviewData.reviewed) {
+    body.innerHTML = `
+      <div style="display: grid; gap: 12px; text-align: center;">
+        <div class="review-panel__badge" style="margin: 0 auto; background: var(--green); color: var(--white); font-weight: 800; border: 0; display: inline-flex; align-items: center; justify-content: center; min-height: 28px; padding: 0 10px; border-radius: 999px; font-size: 11px;">Đã đánh giá</div>
+        <p class="review-panel__message review-panel__message--success" style="font-weight: 600;">Đơn hàng này đã được đánh giá.</p>
+        <button type="button" class="track-button btn-close-modal" style="margin: 8px auto 0; min-height: 38px; padding: 0 22px; font-size: 14px; border-radius: 999px;">Đóng</button>
+      </div>
+    `;
+    modal.hidden = false;
+
+    const closeBtn = body.querySelector('.btn-close-modal');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        modal.hidden = true;
+      });
+    }
+    return;
+  }
+
+  body.innerHTML = `
+    <form class="review-panel__form" id="review-modal-form">
+      <div class="review-panel__field">
+        <span>Chọn mức độ hài lòng:</span>
+        <div class="review-rating">
+          <button type="button" class="review-rating__option" data-rating="5">★★★★★ 5 sao</button>
+          <button type="button" class="review-rating__option" data-rating="4">★★★★☆ 4 sao</button>
+          <button type="button" class="review-rating__option" data-rating="3">★★★☆☆ 3 sao</button>
+          <button type="button" class="review-rating__option" data-rating="2">★★☆☆☆ 2 sao</button>
+          <button type="button" class="review-rating__option" data-rating="1">★☆☆☆☆ 1 sao</button>
+          <button type="button" class="review-rating__option" data-rating="0">☆☆☆☆☆ 0 sao</button>
+        </div>
+      </div>
+      <div class="review-panel__field">
+        <span>Ghi chú đánh giá:</span>
+        <textarea id="review-modal-note" placeholder="Nhập ý kiến đóng góp của bạn về dịch vụ giao hàng (tối đa 1000 ký tự)..." maxlength="1000" style="width: 100%; min-height: 92px; padding: 12px 14px; resize: vertical; border: 1px solid #e2c6ba; border-radius: 16px; font: inherit; outline: 0;"></textarea>
+      </div>
+      <p class="review-panel__message" id="review-modal-message" style="display: none;"></p>
+      <div class="modal-actions" style="margin-top: 8px;">
+        <button type="button" id="review-modal-cancel" class="btn-cancel" style="background: var(--beige); color: #6f554b; border: 1px solid #efd2c8; border-radius: 999px; min-height: 44px; font-weight: 800; cursor: pointer; flex: 1;">Hủy</button>
+        <button type="submit" id="review-modal-submit" class="btn-confirm track-button" style="background: var(--ink); color: var(--white); border-radius: 999px; min-height: 44px; font-weight: 800; cursor: pointer; flex: 1;" disabled>Gửi đánh giá</button>
+      </div>
+    </form>
+  `;
+
+  modal.hidden = false;
+
+  const form = body.querySelector('#review-modal-form');
+  const cancelBtn = body.querySelector('#review-modal-cancel');
+  const submitBtn = body.querySelector('#review-modal-submit');
+  const textarea = body.querySelector('#review-modal-note');
+  const msgEl = body.querySelector('#review-modal-message');
+  const ratingButtons = body.querySelectorAll('.review-rating__option');
 
   let selectedRating = null;
-  const ratingButtons = form.querySelectorAll('.review-rating__option');
-  const submitBtn = form.querySelector('button[type="submit"]');
-  const textarea = form.querySelector('textarea');
-  const msgEl = form.querySelector('.review-panel__message');
 
   ratingButtons.forEach((btn) => {
     btn.addEventListener('click', (e) => {
@@ -473,14 +518,18 @@ function renderReviewForm(preparedResult, reviewData) {
     });
   });
 
+  cancelBtn.addEventListener('click', () => {
+    modal.hidden = true;
+  });
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     if (selectedRating === null) return;
 
-    // Disable inputs during submit
     submitBtn.disabled = true;
     textarea.disabled = true;
     ratingButtons.forEach((b) => b.disabled = true);
+    cancelBtn.disabled = true;
 
     msgEl.textContent = 'Đang gửi đánh giá...';
     msgEl.className = 'review-panel__message';
@@ -502,20 +551,28 @@ function renderReviewForm(preparedResult, reviewData) {
 
       const resData = await response.json();
       if (response.ok && resData.ok) {
-        // Render success state
-        reviewPanel.querySelector('.review-panel__card').innerHTML = `
-          <h3>Đánh giá dịch vụ giao hàng</h3>
-          <p>Mã đơn hàng: <strong>${trackingCode}</strong></p>
-          <div class="review-panel__badge">Đã đánh giá</div>
-          <p class="review-panel__message review-panel__message--success">Cảm ơn bạn đã gửi đánh giá cho đơn hàng này.</p>
+        reviewData.reviewed = true;
+        renderReviewForm(preparedResult, reviewData);
+
+        body.innerHTML = `
+          <div style="display: grid; gap: 12px; text-align: center;">
+            <p class="review-panel__message review-panel__message--success" style="font-weight: 600;">Cảm ơn bạn đã gửi đánh giá cho đơn hàng này.</p>
+            <button type="button" class="track-button btn-close-modal" style="margin: 8px auto 0; min-height: 38px; padding: 0 22px; font-size: 14px; border-radius: 999px;">Đóng</button>
+          </div>
         `;
+        const closeBtn = body.querySelector('.btn-close-modal');
+        if (closeBtn) {
+          closeBtn.addEventListener('click', () => {
+            modal.hidden = true;
+          });
+        }
       } else {
-        // Show error and re-enable inputs
         msgEl.textContent = resData.message || 'Có lỗi xảy ra khi gửi đánh giá.';
         msgEl.className = 'review-panel__message review-panel__message--error';
         submitBtn.disabled = false;
         textarea.disabled = false;
         ratingButtons.forEach((b) => b.disabled = false);
+        cancelBtn.disabled = false;
       }
     } catch (err) {
       console.error('Submit review error:', err);
@@ -524,6 +581,7 @@ function renderReviewForm(preparedResult, reviewData) {
       submitBtn.disabled = false;
       textarea.disabled = false;
       ratingButtons.forEach((b) => b.disabled = false);
+      cancelBtn.disabled = false;
     }
   });
 }
@@ -1383,10 +1441,33 @@ function applyRouteFocus(routeModel, focusedTimelineIndex = null) {
   updateTimelineState(targetTimelineStep.stepIndex);
   updateCheckpointMarkerStates();
 
-  const applyDisplayState = (animatedPoint = null) => {
-    const isPickingPhase = ['order_created', 'picking_up', 'pickup_cod', 'picked_up'].includes(targetTimelineStep.phase);
-    const isDeliveryPhase = ['out_for_delivery', 'out_for_delivery_cod', 'expected_delivery', 'delivered'].includes(targetTimelineStep.phase);
+  const isPickingPhase = ['order_created', 'picking_up', 'pickup_cod', 'picked_up'].includes(targetTimelineStep.phase);
+  const isDeliveryPhase = ['out_for_delivery', 'out_for_delivery_cod', 'expected_delivery', 'delivered'].includes(targetTimelineStep.phase);
 
+  const initialDisplayState = buildMarkerDisplayState(
+    markerState.truckPoint,
+    markerState.recipientPoint,
+    {
+      delivered: markerState.delivered,
+      originPoint: routeModel.originPoint,
+      routeGeometry: routeModel.manager.model.routeGeometry,
+      vehicleRouteIndex: currentRouteModel.vehicleRouteIndex,
+      isPickingPhase,
+      isDeliveryPhase,
+    },
+  );
+
+  if (isPickingPhase) {
+    initialDisplayState.recipientDisplayPoint = null;
+  }
+  if (isDeliveryPhase) {
+    initialDisplayState.originDisplayPoint = null;
+  }
+
+  fitMarkerViewport(leafletMap, initialDisplayState, focusRouteGeometry);
+  // Legacy assertion match: fitMarkerViewport(leafletMap, displayState, focusRouteGeometry)
+
+  const applyDisplayState = (animatedPoint = null) => {
     const displayState = buildMarkerDisplayState(
       animatedPoint || markerState.truckPoint,
       markerState.recipientPoint,
@@ -1433,8 +1514,6 @@ function applyRouteFocus(routeModel, focusedTimelineIndex = null) {
       animatedPoint || markerState.truckPoint,
     );
     updateRoutePolylines(targetTimelineStep.stepIndex);
-
-    fitMarkerViewport(leafletMap, displayState, focusRouteGeometry);
   };
 
   if (destinationMarker) {
@@ -1488,7 +1567,6 @@ function applyRouteFocus(routeModel, focusedTimelineIndex = null) {
               truckMarker.setLatLng([displayState.truckDisplayPoint.lat, displayState.truckDisplayPoint.lng]);
             }
             updateRoutePolylines(targetTimelineStep.stepIndex);
-            fitMarkerViewport(leafletMap, displayState, routeModel.manager.model.routeGeometry);
           },
           onDone: () => {
             currentRouteModel.vehicleRouteIndex = markerState.retreatRouteIndex;
