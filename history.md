@@ -420,3 +420,19 @@
 - Resolved the issue where live API responses return null/missing `to_location` and `from_location` coordinates, causing the map route to fall back to the HCMC coordinate (which happened to be close to the user's location). Now, the server queries the local synchronized database `ghn_orders.json` to lookup the order and merges the geocoded locations into the live API response.
 - Reduced the default overlap threshold to `0.0002` and the overlap offset to `0.00015` in `src/mapViewport.mjs`. This prevents the truck marker `🚚` from jumping blocks away and floating off the road at street-level zoom levels.
 
+## Recent Updates (Delivered Spacing, Dynamic Zoom, and Route Polyline Colors)
+### Modified files
+- [src/TrackingRouteManager.mjs](file:///d:/Work/HOtracking/src/TrackingRouteManager.mjs)
+- [src/mapViewport.mjs](file:///d:/Work/HOtracking/src/mapViewport.mjs)
+- [src/app.js](file:///d:/Work/HOtracking/src/app.js)
+- [history.md](file:///d:/Work/HOtracking/history.md)
+
+### Commands executed
+- `npm test`
+
+### Fixes applied
+- Modified `getRetreatRouteIndex()` in `src/TrackingRouteManager.mjs` to return `this.model.destinationRouteIndex` so that the vehicle marker stops next to the recipient icon when successfully delivered instead of retreating 8% of the route.
+- Updated `buildMarkerDisplayState` in `src/mapViewport.mjs` to apply a larger visual offset (1.5x) when the state is `delivered`, ensuring the truck and recipient emoji markers do not collide and maintain a clean separation.
+- Integrated phase-based landmark filtering in `applyDisplayState` and `fitSegmentedJourney` inside `src/app.js`. By dynamically focusing only on the origin and truck during picking phases, and only on the truck and recipient during delivery phases, Leaflet's bounds calculations automatically zoom in closer to the active endpoints, achieving a dynamic zoom effect.
+- Updated `getRouteLineStyle()` in `src/app.js` to style the base line identically to the completed line style (light/dimmed blue). This prevents the bright blue base line from bleeding through the completed segments, ensuring the completed path segments visually dim correctly.
+

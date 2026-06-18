@@ -295,8 +295,7 @@ export class TrackingRouteManager {
   }
 
   getRetreatRouteIndex() {
-    const retreatDistance = Math.max(2, Math.round(this.model.routeGeometry.length * 0.08));
-    return Math.max(this.model.originRouteIndex, this.model.destinationRouteIndex - retreatDistance);
+    return this.model.destinationRouteIndex;
   }
 
   moveVehicleToStep(stepIndex) {

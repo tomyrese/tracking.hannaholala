@@ -1020,7 +1020,7 @@ function getRouteLineStyle(kind) {
   if (kind === 'remaining') {
     return { color: '#2196f3', weight: 6, opacity: 0.95 };
   }
-  return { color: '#64b5f6', weight: 7, opacity: 0.95 };
+  return { color: '#90caf9', weight: 6, opacity: 0.5 };
 }
 
 function getCheckpointVisualState(stepIndex) {
@@ -1189,6 +1189,9 @@ function applyRouteFocus(routeModel, focusedTimelineIndex = null) {
   updateCheckpointMarkerStates();
 
   const applyDisplayState = (animatedPoint = null) => {
+    const isPickingPhase = ['order_created', 'picking_up', 'pickup_cod', 'picked_up'].includes(targetTimelineStep.phase);
+    const isDeliveryPhase = ['out_for_delivery', 'out_for_delivery_cod', 'expected_delivery', 'delivered'].includes(targetTimelineStep.phase);
+
     const displayState = buildMarkerDisplayState(
       animatedPoint || markerState.truckPoint,
       markerState.recipientPoint,
@@ -1197,6 +1200,13 @@ function applyRouteFocus(routeModel, focusedTimelineIndex = null) {
         originPoint: routeModel.originPoint,
       },
     );
+
+    if (isPickingPhase) {
+      displayState.recipientDisplayPoint = null;
+    }
+    if (isDeliveryPhase) {
+      displayState.originDisplayPoint = null;
+    }
 
     if (originMarker && displayState.originDisplayPoint) {
       originMarker.setLatLng([
@@ -1265,6 +1275,7 @@ function applyRouteFocus(routeModel, focusedTimelineIndex = null) {
               delivered: true,
               originPoint: routeModel.originPoint,
             });
+            displayState.originDisplayPoint = null;
             if (originMarker && displayState.originDisplayPoint) {
               originMarker.setLatLng([displayState.originDisplayPoint.lat, displayState.originDisplayPoint.lng]);
             }
@@ -1414,14 +1425,19 @@ async function renderSegmentedJourney(journey, preparedRoute = null) {
 
 function fitSegmentedJourney(map) {
   if (!map || !currentRouteModel?.manager) return;
+  const activeStep = currentRouteModel.manager.stepsChronological[currentRouteModel.manager.activeStepIndex];
+  const phase = activeStep?.phase;
+  const isPickingPhase = ['order_created', 'picking_up', 'pickup_cod', 'picked_up'].includes(phase);
+  const isDeliveryPhase = ['out_for_delivery', 'out_for_delivery_cod', 'expected_delivery', 'delivered'].includes(phase);
+
   const markerState = currentRouteModel.manager.updateMarkerStates(
     currentRouteModel.manager.activeStepIndex,
     currentRouteModel.vehicleRouteIndex,
   );
   fitMarkerViewport(map, {
     truckDisplayPoint: markerState.truckDisplayPoint,
-    recipientDisplayPoint: markerState.recipientDisplayPoint,
-    originDisplayPoint: currentRouteModel.originPoint,
+    recipientDisplayPoint: isPickingPhase ? null : markerState.recipientDisplayPoint,
+    originDisplayPoint: isDeliveryPhase ? null : currentRouteModel.originPoint,
     hasVisualSeparation: markerState.hasVisualSeparation,
   });
 }

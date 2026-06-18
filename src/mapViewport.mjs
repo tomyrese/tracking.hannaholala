@@ -22,7 +22,8 @@ export function buildMarkerDisplayState(truckPoint, recipientPoint) {
       Math.abs(truckDisplay.lng - recipientDisplay.lng) <= overlapThreshold;
 
     if (nearEachOther) {
-      truckDisplay.lng = truckPoint.lng - overlapOffset;
+      const effectiveOffset = delivered ? overlapOffset * 1.5 : overlapOffset;
+      truckDisplay.lng = truckPoint.lng - effectiveOffset;
       hasVisualSeparation = true;
     }
   }
