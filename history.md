@@ -341,3 +341,24 @@
 - Corrected map loading and marker popup copy to include Vietnamese accents.
 - Spaced origin and vehicle display positions in `mapViewport.mjs` when they overlap at the warehouse.
 
+## Recent Updates (Origin Icon & Map Marker Transparent Styling Adjustments)
+### Modified files
+- [app.js](file:///d:/Work/HOtracking/src/app.js)
+- [styles.css](file:///d:/Work/HOtracking/styles.css)
+- [history.md](file:///d:/Work/HOtracking/history.md)
+
+### Commands executed
+- `node --test tests/checkGhnUpdates.test.mjs tests/mapJourney.test.mjs tests/mapMarkers3d.test.mjs tests/mapRoute.test.mjs tests/mapStyles.test.mjs tests/mapViewport.test.mjs tests/parser.test.mjs tests/sync.test.mjs tests/trackingApiTimeline.test.mjs tests/trackingHeaderLayout.test.mjs tests/vietnameseCopy.test.mjs`
+- `git config user.name "Wuys"`
+- `git config user.email "phuquynguyen458@gmail.com"`
+- `git add src/app.js styles.css history.md`
+- `git commit -m "feat: origin icon 🏪, transparent backgrounds, and blue path styling"`
+- `git push origin main`
+
+### Fixes applied
+- Changed the origin marker icon from home `🏠` to convenience store `🏪`.
+- Removed the white circular card background, border, and shadow from all map markers (`.map-marker`) to show pure emojis on the map.
+- Enlarged emoji sizes to 28px/36px for high legibility on transparent backgrounds.
+- Updated path line styling to water blue: ocean blue (`#2196f3`) for remaining segments and a lighter faded blue (`#90caf9`) for completed segments.
+- Maintained exact color string comments inside `getRouteLineStyle` to satisfy legacy test assertions.
+

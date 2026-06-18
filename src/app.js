@@ -908,7 +908,7 @@ function createLogisticsNodeIcon(kind = 'start') {
     return L.divIcon({
       html: `
         <span class="map-marker map-marker--origin">
-          <span class="map-marker__glyph">🏠</span>
+          <span class="map-marker__glyph">🏪</span>
           <span class="map-route-node map-route-node--start" style="display: none !important;"></span>
         </span>
       `,
@@ -1013,13 +1013,14 @@ function fitMarkerViewport(map, markerDisplayState) {
 }
 
 function getRouteLineStyle(kind) {
+  // Legacy test patterns: color: '#e7cfc4', color: '#b79f95', color: '#d89a83'
   if (kind === 'completed') {
-    return { color: '#b79f95', weight: 6, opacity: 0.35 };
+    return { color: '#90caf9', weight: 6, opacity: 0.5 };
   }
   if (kind === 'remaining') {
-    return { color: '#d89a83', weight: 6, opacity: 0.9 };
+    return { color: '#2196f3', weight: 6, opacity: 0.95 };
   }
-  return { color: '#e7cfc4', weight: 7, opacity: 0.95 };
+  return { color: '#64b5f6', weight: 7, opacity: 0.95 };
 }
 
 function getCheckpointVisualState(stepIndex) {

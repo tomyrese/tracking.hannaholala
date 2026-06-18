@@ -1121,11 +1121,11 @@ h1 {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  border: 2.5px solid #ffffff;
-  box-shadow: 0 10px 24px rgba(34, 34, 34, 0.14);
-  background: #ffffff;
+  background: transparent;
+  border: none;
+  box-shadow: none;
   position: relative;
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .map-marker__glyph {
@@ -1141,17 +1141,16 @@ h1 {
   height: 40px;
 }
 .map-marker--origin .map-marker__glyph {
-  font-size: 20px;
+  font-size: 28px;
 }
 
 .map-marker--vehicle {
   width: 52px;
   height: 52px;
-  background: #ffffff;
   z-index: 1000;
 }
 .map-marker--vehicle .map-marker__glyph {
-  font-size: 28px;
+  font-size: 36px;
 }
 
 .map-marker--recipient {
@@ -1159,7 +1158,7 @@ h1 {
   height: 40px;
 }
 .map-marker--recipient .map-marker__glyph {
-  font-size: 20px;
+  font-size: 28px;
 }
 
 /* Success badge after delivery */
