@@ -134,19 +134,28 @@ function attachCardEvents(root) {
   });
 }
 
-function initSlider(root, grid) {
+function initSlider(root, grid, N, cloneCount) {
   const btnLeft = root.querySelector('[data-products-arrow-left]');
   const btnRight = root.querySelector('[data-products-arrow-right]');
-  if (!btnLeft || !btnRight) return;
+  if (!btnLeft || !btnRight || N === 0) return;
 
+  const cardWidth = 192; // 184px width + 8px gap
   let isAnimating = false;
 
-  const updateArrows = () => {
-    const scrollLeft = grid.scrollLeft;
-    const maxScroll = grid.scrollWidth - grid.clientWidth;
-    
-    btnLeft.disabled = scrollLeft <= 2;
-    btnRight.disabled = scrollLeft >= maxScroll - 2;
+  // Set initial scroll position to skip prepended clones and start on the first real item
+  grid.scrollLeft = cloneCount * cardWidth;
+
+  const handleWrapAround = () => {
+    const current = grid.scrollLeft;
+    const minBound = (cloneCount - 1) * cardWidth;
+    const maxBound = (cloneCount + N) * cardWidth;
+    const loopWidth = N * cardWidth;
+
+    if (current < minBound) {
+      grid.scrollLeft = current + loopWidth;
+    } else if (current >= maxBound) {
+      grid.scrollLeft = current - loopWidth;
+    }
   };
 
   const animateScroll = (direction) => {
@@ -154,11 +163,9 @@ function initSlider(root, grid) {
     isAnimating = true;
 
     const start = grid.scrollLeft;
-    const cardWidth = 192; // 184px width + 8px gap
     const currentCardIndex = Math.round(start / cardWidth);
     const targetCardIndex = currentCardIndex + direction;
-    const maxScroll = grid.scrollWidth - grid.clientWidth;
-    const target = Math.max(0, Math.min(maxScroll, targetCardIndex * cardWidth));
+    const target = targetCardIndex * cardWidth;
 
     const change = target - start;
     const duration = 400; // ms
@@ -177,13 +184,17 @@ function initSlider(root, grid) {
         requestAnimationFrame(step);
       } else {
         grid.scrollLeft = target;
+        handleWrapAround();
         isAnimating = false;
-        updateArrows();
       }
     }
 
     requestAnimationFrame(step);
   };
+
+  // Enable buttons (they should never be disabled in infinite loop)
+  btnLeft.disabled = false;
+  btnRight.disabled = false;
 
   btnLeft.addEventListener('click', (e) => {
     e.preventDefault();
@@ -195,18 +206,11 @@ function initSlider(root, grid) {
     animateScroll(1);
   });
 
-  grid.addEventListener('scroll', updateArrows, { passive: true });
-  
-  // Use ResizeObserver to update arrow status on screen resize
-  if (window.ResizeObserver) {
-    const observer = new ResizeObserver(() => {
-      updateArrows();
-    });
-    observer.observe(grid);
-  }
-
-  // Initial update
-  updateArrows();
+  grid.addEventListener('scroll', () => {
+    if (!isAnimating) {
+      handleWrapAround();
+    }
+  }, { passive: true });
 }
 
 export async function mountFeaturedProducts() {
@@ -220,18 +224,23 @@ export async function mountFeaturedProducts() {
 
   try {
     const payload = await fetchFeaturedProducts();
-    // Do not slice to 5, allow all loaded products (up to 12) to be displayed
     const products = Array.isArray(payload?.products) ? payload.products : [];
 
     if (!payload?.ok || products.length === 0) {
       throw new Error(payload?.message || 'Khong the tai san pham');
     }
 
-    grid.innerHTML = products.map(createCard).join('');
+    // Build prepended and appended clones for infinite looping
+    const cloneCount = Math.min(5, products.length);
+    const prependedClones = products.slice(-cloneCount);
+    const appendedClones = products.slice(0, cloneCount);
+    const displayedProducts = [...prependedClones, ...products, ...appendedClones];
+
+    grid.innerHTML = displayedProducts.map(createCard).join('');
 
     attachCardEvents(grid);
     injectProductSchema(products);
-    initSlider(root, grid);
+    initSlider(root, grid, products.length, cloneCount);
   } catch (error) {
     grid.innerHTML = '';
   }
