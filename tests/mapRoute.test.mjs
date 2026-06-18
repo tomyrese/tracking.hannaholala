@@ -217,3 +217,16 @@ test('isLandPoint rejects obvious sea points inside the broad Vietnam longitude/
   assert.equal(isLandPoint(16.2, 109.8), false);
   assert.equal(isLandPoint(18.3, 108.9), false);
 });
+
+test('falls back to a Vietnam land route for a Southern delivery (e.g. HCMC to Ca Mau) tracing the Mekong Delta', async () => {
+  const route = await fetchRoadRoute(
+    async () => ({ ok: false }),
+    { lat: 10.8231, lng: 106.6297 }, // HCMC
+    { lat: 9.176, lng: 105.15 }, // Ca Mau
+  );
+
+  assert.equal(route.length > 2, true);
+  assert.deepEqual(route[0], [10.8231, 106.6297]);
+  assert.deepEqual(route.at(-1), [9.176, 105.15]);
+  assert.equal(route.every(([lat, lng]) => isPointInVietnamBounds(lat, lng) && isLandPoint(lat, lng)), true);
+});

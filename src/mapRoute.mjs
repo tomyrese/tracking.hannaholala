@@ -11,6 +11,13 @@ export const VIETNAM_MAP_BOUNDS = {
 };
 
 const VIETNAM_BACKBONE = [
+  { lat: 9.176, lng: 105.15 },       // Ca Mau
+  { lat: 9.29, lng: 105.72 },        // Bac Lieu
+  { lat: 9.6, lng: 105.97 },         // Soc Trang
+  { lat: 10.03, lng: 105.78 },       // Can Tho
+  { lat: 10.25, lng: 105.96 },       // Vinh Long
+  { lat: 10.37, lng: 106.36 },       // Tien Giang
+  { lat: 10.52, lng: 106.41 },       // Long An
   { lat: 10.8231, lng: 106.6297 },   // TP.HCM
   { lat: 11.12, lng: 106.71 },       // Binh Duong
   { lat: 10.95, lng: 106.85 },       // Dong Nai
