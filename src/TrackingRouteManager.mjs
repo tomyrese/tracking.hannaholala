@@ -119,11 +119,23 @@ function shiftPointAlongRoute(routeGeometry, currentIndex, distanceOffset, direc
   while (true) {
     let nextIndex = direction === 'backward' ? index - 1 : index + 1;
     if (nextIndex < 0 || nextIndex >= routeGeometry.length) {
-      return { ...routeGeometry[index] };
+      const boundary = routeGeometry[index];
+      return Array.isArray(boundary) 
+        ? { lat: Number(boundary[0]), lng: Number(boundary[1]) }
+        : { lat: Number(boundary.lat), lng: Number(boundary.lng) };
     }
     
-    const p1 = routeGeometry[index];
-    const p2 = routeGeometry[nextIndex];
+    const rawP1 = routeGeometry[index];
+    const rawP2 = routeGeometry[nextIndex];
+    
+    const p1 = Array.isArray(rawP1)
+      ? { lat: Number(rawP1[0]), lng: Number(rawP1[1]) }
+      : { lat: Number(rawP1?.lat), lng: Number(rawP1?.lng) };
+      
+    const p2 = Array.isArray(rawP2)
+      ? { lat: Number(rawP2[0]), lng: Number(rawP2[1]) }
+      : { lat: Number(rawP2?.lat), lng: Number(rawP2?.lng) };
+    
     const dist = Math.hypot(p2.lat - p1.lat, p2.lng - p1.lng);
     
     accumulatedDistance += dist;
