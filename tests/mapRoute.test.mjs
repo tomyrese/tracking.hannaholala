@@ -98,7 +98,7 @@ test('falls back to a Vietnam-shaped route when OSRM returns geometry outside Vi
   assert.equal(route.every(([lat, lng]) => isPointInVietnamBounds(lat, lng) && isLandPoint(lat, lng)), true);
 });
 
-test('falls back when OSRM returns even a tiny minority of points outside the allowed Vietnam land corridor', async () => {
+test('preserves the full OSRM geometry when only a tiny minority of domestic points fall outside the land heuristic', async () => {
   const route = await fetchRoadRoute(
     async () => ({
       ok: true,
@@ -125,8 +125,14 @@ test('falls back when OSRM returns even a tiny minority of points outside the al
     { lat: 10.8, lng: 106.8 },
   );
 
-  assert.equal(route.every(([lat, lng]) => isPointInVietnamBounds(lat, lng) && isLandPoint(lat, lng)), true);
-  assert.equal(route.length >= 2, true);
+  assert.deepEqual(route, [
+    [10.5, 106.5],
+    [10.7, 106.55],
+    [10.9, 106.6],
+    [12.1, 105.95],
+    [11.2, 106.7],
+    [10.8, 106.8],
+  ]);
 });
 
 test('fetchRoadRouteForPoints uses OSRM waypoint routing when multiple anchors are provided', async () => {

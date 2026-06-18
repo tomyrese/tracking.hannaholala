@@ -33,8 +33,16 @@ function clonePoint(point) {
   return point ? { lat: point.lat, lng: point.lng } : null;
 }
 
+function hasFinitePoint(point) {
+  return Number.isFinite(point?.lat) && Number.isFinite(point?.lng);
+}
+
 function pointsEqual(a, b) {
   return !!a && !!b && a.lat === b.lat && a.lng === b.lng;
+}
+
+function dedupePoints(points) {
+  return points.filter((point, index) => index === 0 || !pointsEqual(point, points[index - 1]));
 }
 
 function normalizeText(value) {
@@ -64,6 +72,9 @@ function classifyTrackingEvent(event, index) {
   if (text.includes('giao thanh cong') || text.includes('giao hang thanh cong') || text.includes('delivered') || text.includes('da tra')) {
     return { phase: 'delivered', rank: 90, label: 'Giao thanh cong', interactive: true };
   }
+  if (text.includes('khoi tao don hang') || text.includes('tao don hang') || text.includes('cho lay hang') || text.includes('ready to pick') || text.includes('ready_to_pick')) {
+    return { phase: 'order_created', rank: 10, label: 'Cho lay hang', interactive: true };
+  }
   if (text.includes('du kien giao')) {
     return { phase: 'expected_delivery', rank: 80, label: 'Du kien giao hang', interactive: true };
   }
@@ -87,9 +98,6 @@ function classifyTrackingEvent(event, index) {
   }
   if (text.includes('dang lay hang')) {
     return { phase: 'picking_up', rank: 20, label: 'Dang lay hang', interactive: true };
-  }
-  if (text.includes('khoi tao don hang') || text.includes('tao don hang') || text.includes('cho lay hang') || text.includes('ready to pick') || text.includes('ready_to_pick')) {
-    return { phase: 'order_created', rank: 10, label: 'Khoi tao don hang', interactive: true };
   }
   if (text.includes('goi hen')) {
     return { phase: 'appointment', rank: 60, label: 'Goi hen', interactive: false };
@@ -219,7 +227,13 @@ export class TrackingRouteManager {
     const routeAnchors = this.generateAnchorPoints(stepsChronological);
     this.routeAnchors = routeAnchors;
 
-    this.stepsChronological = stepsChronological.map((step) => ({ ...step, point: null, routeIndex: null, isRoutePoint: false }));
+    this.stepsChronological = stepsChronological.map((step) => ({
+      ...step,
+      anchorPoint: clonePoint(step.point),
+      point: null,
+      routeIndex: null,
+      isRoutePoint: false,
+    }));
     this.timelineSteps = [...this.stepsChronological].sort((a, b) => b.stepIndex - a.stepIndex);
     let activeIdx = this.stepsChronological.length - 1;
     for (let i = this.stepsChronological.length - 1; i >= 0; i--) {
@@ -234,6 +248,7 @@ export class TrackingRouteManager {
     const latestStep = this.stepsChronological.at(-1) || null;
     const delivered = latestStep?.phase === 'delivered';
     const currentPoint = delivered ? destinationPoint : originPoint;
+    const initialRouteGeometry = dedupePoints(routeAnchors.map((anchor) => clonePoint(anchor.point)).filter(hasFinitePoint));
 
     return {
       origin: clonePoint(originPoint),
@@ -242,10 +257,10 @@ export class TrackingRouteManager {
       currentTitle: latestStep?.title || 'Vi tri xe hien tai',
       currentCheckpoint: latestStep,
       routePoints: routeAnchors,
-      routeGeometry: [clonePoint(originPoint), clonePoint(destinationPoint)],
+      routeGeometry: initialRouteGeometry,
       routeGeometryByStep: new Map(),
       originRouteIndex: 0,
-      destinationRouteIndex: 1,
+      destinationRouteIndex: Math.max(0, initialRouteGeometry.length - 1),
       checkpoints: this.timelineSteps,
       stepsChronological: this.stepsChronological,
       isDelivered: delivered,
@@ -264,6 +279,11 @@ export class TrackingRouteManager {
     ).filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng));
 
     if (normalizedPoints.length < 2) return;
+
+    console.log('Route Geometry Length:', normalizedPoints.length);
+    if (normalizedPoints.length < 10) {
+      console.warn('Route geometry looks too short; expected dense OSRM geometry but received fewer than 10 points.');
+    }
 
     const routeIndexByStep = this.buildTimelinePoints(normalizedPoints, this.stepsChronological.length);
 
@@ -315,15 +335,90 @@ export class TrackingRouteManager {
       return result;
     }
 
-    if (totalSteps === 1) {
-      result.set(0, routeCoords.length - 1);
+    const locateNearestRouteIndex = (point, startIndex = 0, endIndex = routeCoords.length - 1) => {
+      if (!hasFinitePoint(point)) return null;
+
+      let bestIndex = Math.max(0, Math.min(startIndex, routeCoords.length - 1));
+      let bestDistance = Infinity;
+
+      for (let index = bestIndex; index <= Math.max(bestIndex, Math.min(endIndex, routeCoords.length - 1)); index += 1) {
+        const candidate = routeCoords[index];
+        const distance = distanceSquared(candidate, point);
+        if (distance < bestDistance) {
+          bestDistance = distance;
+          bestIndex = index;
+        }
+      }
+
+      return bestIndex;
+    };
+
+    const knownAssignments = [
+      { stepIndex: -1, routeIndex: 0 },
+      { stepIndex: totalSteps, routeIndex: routeCoords.length - 1 },
+    ];
+
+    const stepAnchorByStepIndex = new Map(
+      this.stepsChronological
+        .filter((step) => hasFinitePoint(step.anchorPoint))
+        .map((step) => [step.stepIndex, clonePoint(step.anchorPoint)]),
+    );
+
+    let minimumRouteIndex = 0;
+    for (let stepIndex = 0; stepIndex < totalSteps; stepIndex += 1) {
+      const anchorPoint = stepAnchorByStepIndex.get(stepIndex);
+      if (!anchorPoint) continue;
+
+      const routeIndex = locateNearestRouteIndex(anchorPoint, minimumRouteIndex);
+      if (routeIndex === null) continue;
+
+      knownAssignments.push({ stepIndex, routeIndex });
+      minimumRouteIndex = routeIndex;
+    }
+
+    knownAssignments.sort((a, b) => a.stepIndex - b.stepIndex);
+
+    const explicitAssignments = new Map(
+      knownAssignments
+        .filter((assignment) => assignment.stepIndex >= 0 && assignment.stepIndex < totalSteps)
+        .map((assignment) => [assignment.stepIndex, assignment.routeIndex]),
+    );
+
+    if (!explicitAssignments.size) {
+      if (totalSteps === 1) {
+        result.set(0, routeCoords.length - 1);
+        return result;
+      }
+
+      for (let index = 0; index < totalSteps; index += 1) {
+        const ratio = index / (totalSteps - 1);
+        const routeIndex = Math.round(ratio * (routeCoords.length - 1));
+        result.set(index, routeIndex);
+      }
+
       return result;
     }
 
-    for (let index = 0; index < totalSteps; index += 1) {
-      const ratio = index / (totalSteps - 1);
-      const routeIndex = Math.round(ratio * (routeCoords.length - 1));
-      result.set(index, routeIndex);
+    for (let stepIndex = 0; stepIndex < totalSteps; stepIndex += 1) {
+      if (explicitAssignments.has(stepIndex)) {
+        result.set(stepIndex, explicitAssignments.get(stepIndex));
+        continue;
+      }
+
+      const nextBoundaryIndex = knownAssignments.findIndex((assignment) => assignment.stepIndex > stepIndex);
+      const previousAssignment = knownAssignments[Math.max(0, nextBoundaryIndex - 1)] || knownAssignments[0];
+      const nextAssignment = knownAssignments[Math.max(0, nextBoundaryIndex)] || knownAssignments.at(-1);
+
+      if (!nextAssignment || previousAssignment.stepIndex === nextAssignment.stepIndex) {
+        result.set(stepIndex, previousAssignment?.routeIndex ?? 0);
+        continue;
+      }
+
+      const ratio = (stepIndex - previousAssignment.stepIndex) / (nextAssignment.stepIndex - previousAssignment.stepIndex);
+      const routeIndex = Math.round(
+        previousAssignment.routeIndex + ((nextAssignment.routeIndex - previousAssignment.routeIndex) * ratio),
+      );
+      result.set(stepIndex, routeIndex);
     }
 
     return result;

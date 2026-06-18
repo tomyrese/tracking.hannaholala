@@ -1349,11 +1349,16 @@ async function prepareSegmentedJourneyRoute(journey) {
   console.log('Route Coordinates', routedPath);
   console.log('Route Length', routedPath?.length ?? 0);
 
+  let routeGeometry = routedPath;
   if (!routedPath || routedPath.length < 2) {
-    const fallbackRoute = manager.model.routeGeometry.map((point) => [point.lat, point.lng]);
-    manager.setRouteGeometry(fallbackRoute);
-  } else {
-    manager.setRouteGeometry(routedPath);
+    routeGeometry = manager.model.routeGeometry.map((point) => [point.lat, point.lng]);
+  }
+
+  manager.setRouteGeometry(routeGeometry);
+
+  console.log('Route Geometry Length:', manager.model.routeGeometry.length);
+  if (manager.model.routeGeometry.length < 10) {
+    console.warn('Route geometry contains fewer than 10 points after routing.');
   }
 
   currentRouteModel.manager = manager;

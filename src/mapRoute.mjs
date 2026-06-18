@@ -123,6 +123,22 @@ function sanitizeRoutePoints(points) {
   return sanitized;
 }
 
+function dedupeRoutePoints(points) {
+  const deduped = [];
+
+  for (const point of points) {
+    const [lat, lng] = toTuple(point);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+
+    const last = deduped[deduped.length - 1];
+    if (!last || last[0] !== lat || last[1] !== lng) {
+      deduped.push([lat, lng]);
+    }
+  }
+
+  return deduped;
+}
+
 function routeLeavesVietnamMeaningfully(points) {
   if (!Array.isArray(points) || !points.length) return true;
 
@@ -215,9 +231,9 @@ function buildVietnamFallbackRouteForPoints(points, fallbackRoute = []) {
 }
 
 function ensureVisibleRoute(route, fallbackRoute) {
-  const sanitizedRoute = sanitizeRoutePoints(route);
-  if (sanitizedRoute.length >= 2) {
-    return sanitizedRoute;
+  const normalizedRoute = dedupeRoutePoints(route);
+  if (normalizedRoute.length >= 2) {
+    return normalizedRoute;
   }
 
   const sanitizedFallback = sanitizeRoutePoints(fallbackRoute);

@@ -83,6 +83,33 @@ test('setRouteGeometry samples every timeline step directly from the route coord
   });
 });
 
+test('setRouteGeometry maps timeline steps to the nearest real checkpoint positions on the routed geometry', () => {
+  const manager = createTrackingRouteManager({
+    from_location: { lat: 10.0, long: 106.0 },
+    to_location: { lat: 10.4, long: 106.4 },
+    events: [
+      { title: 'Giao thanh cong', lat: 10.4, lng: 106.4, time: '12:00' },
+      { title: 'Dang giao', lat: 10.31, lng: 106.31, time: '11:00' },
+      { title: 'Dang luan chuyen', lat: 10.15, lng: 106.15, time: '10:00' },
+      { title: 'Da lay hang', lat: 10.04, lng: 106.04, time: '09:00' },
+      { title: 'Khoi tao don hang', lat: 10.0, lng: 106.0, time: '08:00' },
+    ],
+  });
+
+  const routeGeometry = Array.from({ length: 41 }, (_, index) => ({
+    lat: 10 + (index * 0.01),
+    lng: 106 + (index * 0.01),
+  }));
+
+  manager.setRouteGeometry(routeGeometry);
+
+  const expectedIndexes = [0, 4, 15, 31, 40];
+  manager.stepsChronological.forEach((step, index) => {
+    assert.equal(step.routeIndex, expectedIndexes[index]);
+    assert.deepEqual(step.point, routeGeometry[expectedIndexes[index]]);
+  });
+});
+
 test('completed and remaining paths are always slices of the main route geometry', () => {
   const manager = createTrackingRouteManager({
     from_location: { lat: 10.1, long: 106.1 },
