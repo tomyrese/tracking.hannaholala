@@ -8,9 +8,9 @@ const routeManagerSource = readFileSync(new URL('../src/TrackingRouteManager.mjs
 
 test('map render uses emoji markers and the new tracking route manager', () => {
   assert.match(appSource, /createTrackingRouteManager/);
+  assert.match(appSource, /buildRoute/);
   assert.match(appSource, /createVehicleMarkerIcon/);
   assert.match(appSource, /createRecipientMarkerIcon/);
-  assert.match(appSource, /fetchRoadRouteForPoints/);
   assert.match(appSource, /createLogisticsNodeIcon/);
   assert.match(appSource, /let animFrameId = null;/);
   assert.doesNotMatch(appSource, /navigator\.geolocation/);
@@ -35,6 +35,12 @@ test('route styles now keep full, completed, and remaining paths simultaneously'
   assert.match(appSource, /fullRoutePolyline = L\.polyline/);
   assert.match(appSource, /completedRoutePolyline = L\.polyline/);
   assert.match(appSource, /remainingRoutePolyline = L\.polyline/);
+});
+
+test('route rendering logs diagnostics and validates fallback route availability before drawing markers', () => {
+  assert.match(appSource, /console\.log\('Route Coordinates'/);
+  assert.match(appSource, /console\.log\('Route Length'/);
+  assert.match(appSource, /if\s*\(!routedPath \|\| routedPath\.length < 2\)/);
 });
 
 test('map rendering no longer keeps legacy straight-line checkpoint connections', () => {

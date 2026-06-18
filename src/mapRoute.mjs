@@ -47,6 +47,16 @@ function toTuple(value) {
   return [point.lat, point.lng];
 }
 
+function hasFinitePoint(point) {
+  return Number.isFinite(point?.lat) && Number.isFinite(point?.lng);
+}
+
+function normalizeRoutingPoints(points) {
+  return (Array.isArray(points) ? points : [])
+    .map(toPoint)
+    .filter(hasFinitePoint);
+}
+
 function distanceSquared(a, b) {
   const deltaLat = a.lat - b.lat;
   const deltaLng = a.lng - b.lng;
@@ -196,66 +206,69 @@ function buildVietnamFallbackRouteForPoints(points, fallbackRoute = []) {
   return merged.length >= 2 ? merged : sanitizeRoutePoints(fallbackRoute);
 }
 
-export async function fetchRoadRouteForPoints(fetchImpl, points, fallbackRoute = []) {
-  if (!Array.isArray(points) || points.length < 2) {
-    return sanitizeRoutePoints(fallbackRoute);
+function ensureVisibleRoute(route, fallbackRoute) {
+  const sanitizedRoute = sanitizeRoutePoints(route);
+  if (sanitizedRoute.length >= 2) {
+    return sanitizedRoute;
   }
 
-  const fallback = buildVietnamFallbackRouteForPoints(points, fallbackRoute);
+  const sanitizedFallback = sanitizeRoutePoints(fallbackRoute);
+  if (sanitizedFallback.length >= 2) {
+    return sanitizedFallback;
+  }
+
+  return sanitizedRoute.length ? sanitizedRoute : sanitizedFallback;
+}
+
+export async function buildRoute(fetchImpl, points, fallbackRoute = []) {
+  const routingPoints = normalizeRoutingPoints(points);
+  const fallback = buildVietnamFallbackRouteForPoints(routingPoints, fallbackRoute);
+
+  if (routingPoints.length < 2) {
+    console.log('OSRM Response', null);
+    console.log('Route Coordinates', []);
+    console.log('Route Length', 0);
+    return ensureVisibleRoute([], fallback);
+  }
 
   try {
-    const response = await fetchImpl(buildOsrmRouteUrl(points));
+    const response = await fetchImpl(buildOsrmRouteUrl(routingPoints));
     if (!response.ok) {
-      return fallback;
+      console.log('OSRM Response', { ok: response.ok, status: response.status ?? null });
+      console.log('Route Coordinates', []);
+      console.log('Route Length', 0);
+      return ensureVisibleRoute([], fallback);
     }
 
-    const data = await response.json();
-    const coordinates = data?.routes?.[0]?.geometry?.coordinates;
-    if (!Array.isArray(coordinates) || coordinates.length < 2) {
-      return fallback;
+    const routeData = await response.json();
+    const coords = Array.isArray(routeData?.routes?.[0]?.geometry?.coordinates)
+      ? routeData.routes[0].geometry.coordinates.map(([lng, lat]) => [lat, lng])
+      : [];
+
+    console.log('OSRM Response', routeData);
+    console.log('Route Coordinates', coords);
+    console.log('Route Length', coords?.length ?? 0);
+
+    if (coords.length < 2 || routeLeavesVietnamMeaningfully(coords)) {
+      return ensureVisibleRoute([], fallback);
     }
 
-    const mappedCoordinates = coordinates.map(([lng, lat]) => [lat, lng]);
-    if (routeLeavesVietnamMeaningfully(mappedCoordinates)) {
-      return fallback;
-    }
-
-    const sanitized = sanitizeRoutePoints(mappedCoordinates);
-    return sanitized.length >= 2 ? sanitized : fallback;
-  } catch {
-    return fallback;
+    return ensureVisibleRoute(coords, fallback);
+  } catch (error) {
+    console.error(error);
+    console.log('OSRM Response', null);
+    console.log('Route Coordinates', []);
+    console.log('Route Length', 0);
+    return ensureVisibleRoute([], fallback);
   }
+}
+
+export async function fetchRoadRouteForPoints(fetchImpl, points, fallbackRoute = []) {
+  return buildRoute(fetchImpl, points, fallbackRoute);
 }
 
 export async function fetchRoadRoute(fetchImpl, start, end) {
   if (!start || !end) return [];
-
-  if (start.lat === end.lat && start.lng === end.lng) {
-    return sanitizeRoutePoints([[start.lat, start.lng]]);
-  }
-
   const fallbackRoute = buildVietnamFallbackRoute(start, end);
-
-  try {
-    const response = await fetchImpl(buildOsrmRouteUrl([start, end]));
-    if (!response.ok) {
-      return fallbackRoute;
-    }
-
-    const data = await response.json();
-    const coordinates = data?.routes?.[0]?.geometry?.coordinates;
-    if (!Array.isArray(coordinates) || coordinates.length < 2) {
-      return fallbackRoute;
-    }
-
-    const mappedCoordinates = coordinates.map(([lng, lat]) => [lat, lng]);
-    if (routeLeavesVietnamMeaningfully(mappedCoordinates)) {
-      return fallbackRoute;
-    }
-
-    const sanitized = sanitizeRoutePoints(mappedCoordinates);
-    return sanitized.length >= 2 ? sanitized : fallbackRoute;
-  } catch {
-    return fallbackRoute;
-  }
+  return buildRoute(fetchImpl, [start, end], fallbackRoute);
 }

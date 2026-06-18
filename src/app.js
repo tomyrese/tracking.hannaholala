@@ -1,6 +1,6 @@
 import { detectCarrier } from './detectCarrier.mjs';
 import { buildMapJourney } from './mapJourney.mjs';
-import { fetchRoadRouteForPoints, VIETNAM_MAP_BOUNDS } from './mapRoute.mjs';
+import { buildRoute, VIETNAM_MAP_BOUNDS } from './mapRoute.mjs';
 import { createTrackingRouteManager } from './TrackingRouteManager.mjs';
 import { buildMarkerDisplayState, buildViewportFocusPoints } from './mapViewport.mjs';
 import { mountFeaturedProducts } from './components/featured-products.js';
@@ -1280,22 +1280,43 @@ function bindTimelineMapFocus() {
   });
 }
 
-async function renderSegmentedJourney(journey) {
+async function prepareSegmentedJourneyRoute(journey) {
   const manager = createTrackingRouteManager(currentRouteModel.result, {
     fallbackOrigin: journey.origin,
     fallbackDestination: journey.destination,
   });
+
+  const routedPath = await buildRoute(
+    fetch,
+    manager.model.routePoints.map((entry) => entry.point).filter(Boolean),
+    manager.model.routeGeometry.map((point) => [point.lat, point.lng]),
+  );
+
+  console.log('Route Coordinates', routedPath);
+  console.log('Route Length', routedPath?.length ?? 0);
+
+  if (!routedPath || routedPath.length < 2) {
+    const fallbackRoute = manager.model.routeGeometry.map((point) => [point.lat, point.lng]);
+    manager.setRouteGeometry(fallbackRoute);
+  } else {
+    manager.setRouteGeometry(routedPath);
+  }
+
   currentRouteModel.manager = manager;
   currentRouteModel.timelineSteps = manager.timelineSteps;
   currentRouteModel.originPoint = manager.model.origin;
-  const routedPath = await fetchRoadRouteForPoints(
-    fetch,
-    manager.model.routePoints.map((entry) => entry.point),
-    manager.model.routeGeometry.map((point) => [point.lat, point.lng]),
-  );
-  manager.setRouteGeometry(routedPath);
   currentRouteModel.vehicleRouteIndex = manager.getRouteIndexForStep(manager.activeStepIndex);
-  const dedupedRoute = manager.model.routeGeometry.map((point) => [point.lat, point.lng]);
+
+  return {
+    manager,
+    routeGeometry: manager.model.routeGeometry.map((point) => [point.lat, point.lng]),
+  };
+}
+
+async function renderSegmentedJourney(journey, preparedRoute = null) {
+  const routePlan = preparedRoute || await prepareSegmentedJourneyRoute(journey);
+  const manager = routePlan.manager;
+  const dedupedRoute = routePlan.routeGeometry;
 
   fullRoutePolyline = L.polyline(dedupedRoute, {
     ...getRouteLineStyle('base'),
@@ -1431,7 +1452,21 @@ async function renderRoadJourneyMap(result) {
     originPoint: journey.origin,
   };
 
-  const markerDisplayState = buildMarkerDisplayState(journey.current, journey.destination, { delivered: isDeliveredJourney });
+  const routePlan = await prepareSegmentedJourneyRoute(journey);
+  if (!routePlan.routeGeometry || routePlan.routeGeometry.length < 2) {
+    renderIdleMinimap();
+    return;
+  }
+
+  const initialMarkerState = routePlan.manager.updateMarkerStates(
+    routePlan.manager.activeStepIndex,
+    currentRouteModel.vehicleRouteIndex,
+  );
+  const markerDisplayState = buildMarkerDisplayState(
+    initialMarkerState.truckPoint,
+    initialMarkerState.recipientPoint,
+    { delivered: isDeliveredJourney },
+  );
 
   originMarker = L.marker([journey.origin.lat, journey.origin.lng], {
     icon: createLogisticsNodeIcon('start'),
@@ -1462,7 +1497,7 @@ async function renderRoadJourneyMap(result) {
     truckMarker.bindPopup('<b>Vị trí xe hiện tại</b>');
   }
 
-  await renderSegmentedJourney(journey);
+  await renderSegmentedJourney(journey, routePlan);
   fitSegmentedJourney(leafletMap);
   bindTimelineMapFocus();
 

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  buildRoute,
   buildOsrmRouteUrl,
   fetchRoadRoute,
   fetchRoadRouteForPoints,
@@ -162,6 +163,54 @@ test('fetchRoadRouteForPoints uses OSRM waypoint routing when multiple anchors a
     [14.6, 107.9],
     [16.0, 108.3],
   ]);
+});
+
+test('buildRoute falls back to a Vietnam land route when OSRM returns no usable geometry', async () => {
+  const route = await buildRoute(
+    async () => ({
+      ok: true,
+      async json() {
+        return {
+          routes: [
+            {
+              geometry: {
+                coordinates: [
+                  [106.7081402, 10.857213],
+                ],
+              },
+            },
+          ],
+        };
+      },
+    }),
+    [
+      { lat: 10.857213, lng: 106.7081402 },
+      { lat: 21.5927453, lng: 103.4238921 },
+    ],
+  );
+
+  assert.equal(route.length > 2, true);
+  assert.deepEqual(route[0], [10.857213, 106.7081402]);
+  assert.deepEqual(route.at(-1), [21.5927453, 103.4238921]);
+  assert.equal(route.every(([lat, lng]) => isPointInVietnamBounds(lat, lng) && isLandPoint(lat, lng)), true);
+});
+
+test('fetchRoadRouteForPoints still returns a visible route when OSRM throws for waypoint routing', async () => {
+  const route = await fetchRoadRouteForPoints(
+    async () => {
+      throw new Error('timeout');
+    },
+    [
+      { lat: 10.857213, lng: 106.7081402 },
+      { lat: 11.12, lng: 106.71 },
+      { lat: 21.0285, lng: 105.8542 },
+    ],
+  );
+
+  assert.equal(route.length > 2, true);
+  assert.deepEqual(route[0], [10.857213, 106.7081402]);
+  assert.deepEqual(route.at(-1), [21.0285, 105.8542]);
+  assert.equal(route.every(([lat, lng]) => isPointInVietnamBounds(lat, lng) && isLandPoint(lat, lng)), true);
 });
 
 test('isLandPoint rejects obvious sea points inside the broad Vietnam longitude/latitude region', () => {
