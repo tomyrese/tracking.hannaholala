@@ -1,6 +1,6 @@
 import { detectCarrier } from './detectCarrier.mjs';
 import { buildMapJourney } from './mapJourney.mjs';
-import { fetchRoadRouteForPoints } from './mapRoute.mjs';
+import { fetchRoadRouteForPoints, VIETNAM_MAP_BOUNDS } from './mapRoute.mjs';
 import { createTrackingRouteManager } from './TrackingRouteManager.mjs';
 import { buildMarkerDisplayState, buildViewportFocusPoints } from './mapViewport.mjs';
 import { mountFeaturedProducts } from './components/featured-products.js';
@@ -1383,6 +1383,12 @@ function fitMarkerViewport(map, markerDisplayState) {
     padding: [56, 56],
     maxZoom: 15,
   });
+
+  try {
+    map.panInsideBounds(L.latLngBounds(VIETNAM_MAP_BOUNDS.southWest, VIETNAM_MAP_BOUNDS.northEast), {
+      animate: false,
+    });
+  } catch (error) {}
 }
 
 function getRouteLineStyle(kind) {
@@ -1792,6 +1798,8 @@ async function renderRoadJourneyMap(result) {
     zoomControl: false,
     attributionControl: false,
   });
+
+  leafletMap.setMaxBounds(L.latLngBounds(VIETNAM_MAP_BOUNDS.southWest, VIETNAM_MAP_BOUNDS.northEast));
 
   leafletMap.setView([16.047079, 108.206230], 6);
 

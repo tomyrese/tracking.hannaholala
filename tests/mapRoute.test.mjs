@@ -1,7 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildOsrmRouteUrl, fetchRoadRoute, fetchRoadRouteForPoints } from '../src/mapRoute.mjs';
+import {
+  buildOsrmRouteUrl,
+  fetchRoadRoute,
+  fetchRoadRouteForPoints,
+  isLandPoint,
+  isPointInVietnamBounds,
+} from '../src/mapRoute.mjs';
 
 test('builds an OSRM route url using lng,lat order', () => {
   const url = buildOsrmRouteUrl([
@@ -56,7 +62,7 @@ test('falls back to a Vietnam-shaped route when the routing service fails for a 
   assert.equal(route.length > 2, true);
   assert.deepEqual(route[0], [10.857213, 106.7081402]);
   assert.deepEqual(route.at(-1), [21.5927453, 103.4238921]);
-  assert.equal(route.some(([lat, lng]) => lat > 14 && lng > 107.5), true);
+  assert.equal(route.every(([lat, lng]) => isPointInVietnamBounds(lat, lng) && isLandPoint(lat, lng)), true);
 });
 
 test('falls back to a Vietnam-shaped route when OSRM returns geometry outside Vietnam', async () => {
@@ -88,10 +94,10 @@ test('falls back to a Vietnam-shaped route when OSRM returns geometry outside Vi
   assert.equal(route.length > 2, true);
   assert.deepEqual(route[0], [10.857213, 106.7081402]);
   assert.deepEqual(route.at(-1), [21.5927453, 103.4238921]);
-  assert.equal(route.some(([lat, lng]) => lat > 14 && lng > 107.5), true);
+  assert.equal(route.every(([lat, lng]) => isPointInVietnamBounds(lat, lng) && isLandPoint(lat, lng)), true);
 });
 
-test('keeps a route when only a tiny minority of points fall just outside the Vietnam polygon', async () => {
+test('falls back when OSRM returns even a tiny minority of points outside the allowed Vietnam land corridor', async () => {
   const route = await fetchRoadRoute(
     async () => ({
       ok: true,
@@ -118,14 +124,8 @@ test('keeps a route when only a tiny minority of points fall just outside the Vi
     { lat: 10.8, lng: 106.8 },
   );
 
-  assert.deepEqual(route, [
-    [10.5, 106.5],
-    [10.7, 106.55],
-    [10.9, 106.6],
-    [12.1, 105.95],
-    [11.2, 106.7],
-    [10.8, 106.8],
-  ]);
+  assert.equal(route.every(([lat, lng]) => isPointInVietnamBounds(lat, lng) && isLandPoint(lat, lng)), true);
+  assert.equal(route.length >= 2, true);
 });
 
 test('fetchRoadRouteForPoints uses OSRM waypoint routing when multiple anchors are provided', async () => {
@@ -162,4 +162,9 @@ test('fetchRoadRouteForPoints uses OSRM waypoint routing when multiple anchors a
     [14.6, 107.9],
     [16.0, 108.3],
   ]);
+});
+
+test('isLandPoint rejects obvious sea points inside the broad Vietnam longitude/latitude region', () => {
+  assert.equal(isLandPoint(16.2, 109.8), false);
+  assert.equal(isLandPoint(18.3, 108.9), false);
 });

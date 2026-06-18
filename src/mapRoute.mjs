@@ -1,90 +1,176 @@
+export const VIETNAM_ROUTE_BOUNDS = {
+  minLat: 8.18,
+  maxLat: 23.39,
+  minLng: 102.14,
+  maxLng: 109.46,
+};
+
+export const VIETNAM_MAP_BOUNDS = {
+  southWest: [7.5, 101.5],
+  northEast: [24.5, 110.5],
+};
+
+const VIETNAM_BACKBONE = [
+  { lat: 10.8231, lng: 106.6297 },   // TP.HCM
+  { lat: 11.12, lng: 106.71 },       // Binh Duong
+  { lat: 10.95, lng: 106.85 },       // Dong Nai
+  { lat: 10.93, lng: 108.1 },        // Phan Thiet
+  { lat: 12.24, lng: 109.19 },       // Nha Trang
+  { lat: 13.78, lng: 109.22 },       // Quy Nhon
+  { lat: 15.12, lng: 108.8 },        // Quang Ngai
+  { lat: 16.07, lng: 108.22 },       // Da Nang
+  { lat: 16.47, lng: 107.58 },       // Hue
+  { lat: 17.47, lng: 106.62 },       // Quang Binh
+  { lat: 18.67, lng: 105.69 },       // Vinh
+  { lat: 19.81, lng: 105.78 },       // Thanh Hoa
+  { lat: 21.0285, lng: 105.8542 },   // Ha Noi
+  { lat: 21.59, lng: 103.42 },       // Dien Bien axis
+];
+
+const LAND_THRESHOLD = 1.15;
+
 export function buildOsrmRouteUrl(points) {
   const encodedPoints = points.map((point) => `${point.lng},${point.lat}`).join(';');
   return `https://router.project-osrm.org/route/v1/driving/${encodedPoints}?overview=full&geometries=geojson`;
 }
 
-const VIETNAM_BOUNDS = {
-  minLat: 8.1,
-  maxLat: 23.9,
-  minLng: 102.0,
-  maxLng: 109.7,
-};
+function toPoint(value) {
+  if (Array.isArray(value)) {
+    const [lat, lng] = value;
+    return { lat: Number(lat), lng: Number(lng) };
+  }
+  return { lat: Number(value?.lat), lng: Number(value?.lng) };
+}
 
-const VIETNAM_CORRIDOR = [
-  { lat: 10.8231, lng: 106.6297 },
-  { lat: 11.56, lng: 108.99 },
-  { lat: 13.78, lng: 109.22 },
-  { lat: 15.12, lng: 108.8 },
-  { lat: 16.47, lng: 107.58 },
-  { lat: 17.47, lng: 106.62 },
-  { lat: 18.67, lng: 105.69 },
-  { lat: 19.81, lng: 105.78 },
-  { lat: 21.0285, lng: 105.8542 },
-  { lat: 21.33, lng: 104.13 },
-  { lat: 21.5927, lng: 103.4239 },
-];
+function toTuple(value) {
+  const point = toPoint(value);
+  return [point.lat, point.lng];
+}
 
-function isPointInVietnam(lat, lng) {
+function distanceSquared(a, b) {
+  const deltaLat = a.lat - b.lat;
+  const deltaLng = a.lng - b.lng;
+  return (deltaLat ** 2) + (deltaLng ** 2);
+}
+
+function distanceToSegment(point, start, end) {
+  const dx = end.lat - start.lat;
+  const dy = end.lng - start.lng;
+  if (dx === 0 && dy === 0) return Math.sqrt(distanceSquared(point, start));
+
+  const t = Math.max(0, Math.min(1, (((point.lat - start.lat) * dx) + ((point.lng - start.lng) * dy)) / ((dx * dx) + (dy * dy))));
+  const projection = {
+    lat: start.lat + (t * dx),
+    lng: start.lng + (t * dy),
+  };
+  return Math.sqrt(distanceSquared(point, projection));
+}
+
+export function isPointInVietnamBounds(lat, lng) {
   return (
-    lat >= VIETNAM_BOUNDS.minLat &&
-    lat <= VIETNAM_BOUNDS.maxLat &&
-    lng >= VIETNAM_BOUNDS.minLng &&
-    lng <= VIETNAM_BOUNDS.maxLng
+    lat >= VIETNAM_ROUTE_BOUNDS.minLat &&
+    lat <= VIETNAM_ROUTE_BOUNDS.maxLat &&
+    lng >= VIETNAM_ROUTE_BOUNDS.minLng &&
+    lng <= VIETNAM_ROUTE_BOUNDS.maxLng
   );
 }
 
+export function isLandPoint(lat, lng) {
+  if (!isPointInVietnamBounds(lat, lng)) return false;
+  const point = { lat, lng };
+
+  let nearest = Infinity;
+  for (let index = 0; index < VIETNAM_BACKBONE.length - 1; index += 1) {
+    const distance = distanceToSegment(point, VIETNAM_BACKBONE[index], VIETNAM_BACKBONE[index + 1]);
+    nearest = Math.min(nearest, distance);
+  }
+
+  return nearest <= LAND_THRESHOLD;
+}
+
+function sanitizeRoutePoints(points) {
+  const sanitized = [];
+
+  for (const point of points) {
+    const [lat, lng] = toTuple(point);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    if (!isPointInVietnamBounds(lat, lng)) continue;
+    if (!isLandPoint(lat, lng)) continue;
+
+    const last = sanitized[sanitized.length - 1];
+    if (!last || last[0] !== lat || last[1] !== lng) {
+      sanitized.push([lat, lng]);
+    }
+  }
+
+  return sanitized;
+}
+
 function routeLeavesVietnamMeaningfully(points) {
-  let outsideCount = 0;
-  let currentOutsideRun = 0;
-  let longestOutsideRun = 0;
+  if (!Array.isArray(points) || !points.length) return true;
+
+  let invalidCount = 0;
+  let longestInvalidRun = 0;
+  let currentInvalidRun = 0;
 
   for (const [lat, lng] of points) {
-    if (isPointInVietnam(lat, lng)) {
-      currentOutsideRun = 0;
+    const valid = isPointInVietnamBounds(lat, lng) && isLandPoint(lat, lng);
+    if (valid) {
+      currentInvalidRun = 0;
       continue;
     }
 
-    outsideCount += 1;
-    currentOutsideRun += 1;
-    longestOutsideRun = Math.max(longestOutsideRun, currentOutsideRun);
+    invalidCount += 1;
+    currentInvalidRun += 1;
+    longestInvalidRun = Math.max(longestInvalidRun, currentInvalidRun);
   }
 
-  return outsideCount >= 3 || longestOutsideRun >= 2 || outsideCount / points.length > 0.35;
+  return invalidCount > 0 || longestInvalidRun > 0;
+}
+
+function findNearestBackboneIndex(point) {
+  let bestIndex = 0;
+  let bestDistance = Infinity;
+
+  VIETNAM_BACKBONE.forEach((candidate, index) => {
+    const currentDistance = distanceSquared(point, candidate);
+    if (currentDistance < bestDistance) {
+      bestDistance = currentDistance;
+      bestIndex = index;
+    }
+  });
+
+  return bestIndex;
 }
 
 function buildVietnamFallbackRoute(start, end) {
-  const directRoute = [
-    [start.lat, start.lng],
-    [end.lat, end.lng],
-  ];
+  const startPoint = toPoint(start);
+  const endPoint = toPoint(end);
+  const startIndex = findNearestBackboneIndex(startPoint);
+  const endIndex = findNearestBackboneIndex(endPoint);
+  const step = startIndex <= endIndex ? 1 : -1;
+  const route = [[startPoint.lat, startPoint.lng]];
 
-  if (!isPointInVietnam(start.lat, start.lng) || !isPointInVietnam(end.lat, end.lng)) {
-    return directRoute;
+  for (let index = startIndex; step > 0 ? index <= endIndex : index >= endIndex; index += step) {
+    const candidate = VIETNAM_BACKBONE[index];
+    if (isPointInVietnamBounds(candidate.lat, candidate.lng) && isLandPoint(candidate.lat, candidate.lng)) {
+      const last = route[route.length - 1];
+      if (!last || last[0] !== candidate.lat || last[1] !== candidate.lng) {
+        route.push([candidate.lat, candidate.lng]);
+      }
+    }
   }
 
-  const latSpan = Math.abs(end.lat - start.lat);
-  const lngSpan = Math.abs(end.lng - start.lng);
-  if (latSpan < 1.2 && lngSpan < 1.2) {
-    return directRoute;
+  const last = route[route.length - 1];
+  if (!last || last[0] !== endPoint.lat || last[1] !== endPoint.lng) {
+    route.push([endPoint.lat, endPoint.lng]);
   }
 
-  const minLat = Math.min(start.lat, end.lat);
-  const maxLat = Math.max(start.lat, end.lat);
-
-  const corridorStops = VIETNAM_CORRIDOR
-    .filter((point) => point.lat > minLat + 0.25 && point.lat < maxLat - 0.25)
-    .sort((a, b) => (start.lat <= end.lat ? a.lat - b.lat : b.lat - a.lat));
-
-  return [
-    [start.lat, start.lng],
-    ...corridorStops.map((point) => [point.lat, point.lng]),
-    [end.lat, end.lng],
-  ];
+  return sanitizeRoutePoints(route);
 }
 
 function mergeRouteSegments(segments) {
   const merged = [];
-
   for (const segment of segments) {
     for (const point of segment) {
       const last = merged[merged.length - 1];
@@ -93,13 +179,12 @@ function mergeRouteSegments(segments) {
       }
     }
   }
-
   return merged;
 }
 
 function buildVietnamFallbackRouteForPoints(points, fallbackRoute = []) {
   if (!Array.isArray(points) || points.length < 2) {
-    return fallbackRoute;
+    return sanitizeRoutePoints(fallbackRoute);
   }
 
   const segments = [];
@@ -107,12 +192,13 @@ function buildVietnamFallbackRouteForPoints(points, fallbackRoute = []) {
     segments.push(buildVietnamFallbackRoute(points[index], points[index + 1]));
   }
 
-  return mergeRouteSegments(segments);
+  const merged = mergeRouteSegments(segments);
+  return merged.length >= 2 ? merged : sanitizeRoutePoints(fallbackRoute);
 }
 
 export async function fetchRoadRouteForPoints(fetchImpl, points, fallbackRoute = []) {
   if (!Array.isArray(points) || points.length < 2) {
-    return fallbackRoute;
+    return sanitizeRoutePoints(fallbackRoute);
   }
 
   const fallback = buildVietnamFallbackRouteForPoints(points, fallbackRoute);
@@ -134,19 +220,18 @@ export async function fetchRoadRouteForPoints(fetchImpl, points, fallbackRoute =
       return fallback;
     }
 
-    return mappedCoordinates;
+    const sanitized = sanitizeRoutePoints(mappedCoordinates);
+    return sanitized.length >= 2 ? sanitized : fallback;
   } catch {
     return fallback;
   }
 }
 
 export async function fetchRoadRoute(fetchImpl, start, end) {
-  if (!start || !end) {
-    return [];
-  }
+  if (!start || !end) return [];
 
   if (start.lat === end.lat && start.lng === end.lng) {
-    return [[start.lat, start.lng]];
+    return sanitizeRoutePoints([[start.lat, start.lng]]);
   }
 
   const fallbackRoute = buildVietnamFallbackRoute(start, end);
@@ -168,7 +253,8 @@ export async function fetchRoadRoute(fetchImpl, start, end) {
       return fallbackRoute;
     }
 
-    return mappedCoordinates;
+    const sanitized = sanitizeRoutePoints(mappedCoordinates);
+    return sanitized.length >= 2 ? sanitized : fallbackRoute;
   } catch {
     return fallbackRoute;
   }
