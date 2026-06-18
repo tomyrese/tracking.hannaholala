@@ -142,7 +142,8 @@ function routeLeavesVietnamMeaningfully(points) {
     longestInvalidRun = Math.max(longestInvalidRun, currentInvalidRun);
   }
 
-  return invalidCount > 0 || longestInvalidRun > 0;
+  const threshold = Math.min(25, Math.max(2, Math.round(points.length * 0.15)));
+  return longestInvalidRun > threshold;
 }
 
 function findNearestBackboneIndex(point) {
