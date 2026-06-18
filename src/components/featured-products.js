@@ -140,10 +140,11 @@ function initSlider(root, grid, N, cloneCount) {
   if (!btnLeft || !btnRight || N === 0) return;
 
   const cardWidth = 192; // 184px width + 8px gap
-  let isAnimating = false;
+  let targetScroll = cloneCount * cardWidth;
+  let animationFrameId = null;
 
   // Set initial scroll position to skip prepended clones and start on the first real item
-  grid.scrollLeft = cloneCount * cardWidth;
+  grid.scrollLeft = targetScroll;
 
   const handleWrapAround = () => {
     const current = grid.scrollLeft;
@@ -153,43 +154,60 @@ function initSlider(root, grid, N, cloneCount) {
 
     if (current < minBound) {
       grid.scrollLeft = current + loopWidth;
+      targetScroll = grid.scrollLeft;
     } else if (current >= maxBound) {
       grid.scrollLeft = current - loopWidth;
+      targetScroll = grid.scrollLeft;
     }
   };
 
-  const animateScroll = (direction) => {
-    if (isAnimating) return;
-    isAnimating = true;
-
+  const animateToTarget = () => {
     const start = grid.scrollLeft;
-    const currentCardIndex = Math.round(start / cardWidth);
-    const targetCardIndex = currentCardIndex + direction;
-    const target = targetCardIndex * cardWidth;
-
-    const change = target - start;
-    const duration = 400; // ms
+    const change = targetScroll - start;
+    const duration = 300; // Fast 300ms for continuous response
     let startTime = null;
+
+    if (animationFrameId) {
+      cancelAnimationFrame(animationFrameId);
+    }
 
     function step(currentTime) {
       if (!startTime) startTime = currentTime;
       const elapsed = currentTime - startTime;
       const progress = Math.min(elapsed / duration, 1);
 
-      // Ease out cubic easing curve
-      const ease = 1 - Math.pow(1 - progress, 3);
+      // Ease out quad for smooth snapping deceleration
+      const ease = progress * (2 - progress);
       grid.scrollLeft = start + change * ease;
 
       if (elapsed < duration) {
-        requestAnimationFrame(step);
+        animationFrameId = requestAnimationFrame(step);
       } else {
-        grid.scrollLeft = target;
+        grid.scrollLeft = targetScroll;
+        animationFrameId = null;
         handleWrapAround();
-        isAnimating = false;
       }
     }
 
-    requestAnimationFrame(step);
+    animationFrameId = requestAnimationFrame(step);
+  };
+
+  const onButtonClick = (direction) => {
+    const loopWidth = N * cardWidth;
+    const minBound = cloneCount * cardWidth;
+    const maxBound = (cloneCount + N) * cardWidth;
+
+    // Shift coordinate space instantly if target already went beyond boundaries due to fast spam clicks
+    if (targetScroll >= maxBound) {
+      grid.scrollLeft -= loopWidth;
+      targetScroll -= loopWidth;
+    } else if (targetScroll < minBound) {
+      grid.scrollLeft += loopWidth;
+      targetScroll += loopWidth;
+    }
+
+    targetScroll += direction * cardWidth;
+    animateToTarget();
   };
 
   // Enable buttons (they should never be disabled in infinite loop)
@@ -198,17 +216,30 @@ function initSlider(root, grid, N, cloneCount) {
 
   btnLeft.addEventListener('click', (e) => {
     e.preventDefault();
-    animateScroll(-1);
+    onButtonClick(-1);
   });
 
   btnRight.addEventListener('click', (e) => {
     e.preventDefault();
-    animateScroll(1);
+    onButtonClick(1);
   });
 
   grid.addEventListener('scroll', () => {
-    if (!isAnimating) {
-      handleWrapAround();
+    if (!animationFrameId) {
+      const current = grid.scrollLeft;
+      const minBound = (cloneCount - 1) * cardWidth;
+      const maxBound = (cloneCount + N) * cardWidth;
+      const loopWidth = N * cardWidth;
+
+      if (current < minBound) {
+        grid.scrollLeft = current + loopWidth;
+        targetScroll = grid.scrollLeft;
+      } else if (current >= maxBound) {
+        grid.scrollLeft = current - loopWidth;
+        targetScroll = grid.scrollLeft;
+      } else {
+        targetScroll = current;
+      }
     }
   }, { passive: true });
 }

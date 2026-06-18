@@ -174,14 +174,13 @@ svg {
   display: flex;
   gap: 8px;
   overflow-x: auto;
-  scroll-behavior: smooth;
+  scroll-behavior: auto; /* Allow immediate JS scrolls without animation fighting */
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE/Edge */
   padding: 8px 4px 16px;
   width: 100%;
   max-width: 952px; /* 5 cards * 184px + 4 gaps * 8px */
   margin: 0 auto;
-  scroll-snap-type: x mandatory;
 }
 
 .featured-products__grid::-webkit-scrollbar {
@@ -262,7 +261,6 @@ svg {
   border-radius: 20px;
   box-shadow: 0 12px 28px rgba(82, 51, 42, .08);
   cursor: pointer;
-  scroll-snap-align: start;
   transition: transform .22s ease, box-shadow .22s ease, border-color .22s ease;
 }
 
