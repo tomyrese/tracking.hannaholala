@@ -133,6 +133,7 @@ function timelineEventsFromManager(manager) {
     lng: step.point?.lng ?? null,
     timelineIndex: index,
     isRoutePoint: Boolean(step.isRoutePoint),
+    isMapInteractive: true,
     isCurrent: Boolean(step.isCurrent),
     timelineState: step.timelineState,
   }));
@@ -145,7 +146,7 @@ function timelineItem(event, index = 0) {
   const lngAttr = event.lng ? ` data-lng="${event.lng}"` : '';
   const titleAttr = ` data-title="${event.title || ''}"`;
   const indexAttr = ` data-timeline-index="${index}"`;
-  const isMapInteractive = Boolean(event.lat && event.lng);
+  const isMapInteractive = event.isMapInteractive ?? Boolean(event.lat && event.lng);
   const interactiveAttr = isMapInteractive ? ' data-map-interactive="true"' : '';
   const itemClassName = [
     'timeline__item',
@@ -1348,7 +1349,7 @@ function focusTimelineCheckpoint(index) {
 }
 
 function bindTimelineMapFocus() {
-  const items = timeline.querySelectorAll('[data-timeline-event][data-lat][data-lng]');
+  const items = timeline.querySelectorAll('[data-timeline-event]');
   items.forEach((item) => {
     item.addEventListener('click', () => {
       focusTimelineCheckpoint(Number(item.dataset.timelineIndex));

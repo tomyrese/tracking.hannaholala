@@ -57,6 +57,7 @@ test('timeline and marker focus are synchronized both ways through shared route 
   assert.match(appSource, /marker\.on\('click', \(\) => focusTimelineCheckpoint\(timelineIndex\)\)/);
   assert.match(appSource, /originMarker\.on\('click'/);
   assert.match(appSource, /destinationMarker\.on\('click'/);
+  assert.match(appSource, /const items = timeline\.querySelectorAll\('\[data-timeline-event\]'\)/);
 });
 
 test('map focus and checkpoint markers now depend on real route geometry instead of synthetic checkpoint positions', () => {
