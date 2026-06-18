@@ -421,20 +421,24 @@ function renderReviewForm(preparedResult, reviewData) {
 
   const trackingCode = reviewData.trackingCode || preparedResult.clientOrderCode || preparedResult.code;
 
-  reviewPanel.innerHTML = `
-    <div class="review-panel__card" style="text-align: center; display: grid; justify-items: center; gap: 8px;">
-      <h3 style="font-size: 15px; margin: 0;">Đánh giá dịch vụ giao hàng</h3>
-      <p style="margin: 0; color: var(--muted); font-size: 12px;">Đơn hàng đã giao thành công. Hãy dành ít phút để đánh giá dịch vụ nhé!</p>
-      ${reviewData.reviewed ? `
-        <div style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+  if (reviewData.reviewed) {
+    reviewPanel.innerHTML = `
+      <div class="review-panel__card" style="text-align: center; display: grid; justify-items: center; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
           <span class="review-panel__badge" style="background: var(--green); color: var(--white); font-weight: 800; border: 0; display: inline-flex; align-items: center; justify-content: center; min-height: 28px; padding: 0 10px; border-radius: 999px; font-size: 11px;">✓ Đã đánh giá</span>
         </div>
-        <button class="track-button btn-open-review-modal" style="min-height: 38px; padding: 0 16px; font-size: 12px; margin-top: 4px;">Xem đánh giá</button>
-      ` : `
+        <button class="track-button btn-open-review-modal" style="min-height: 38px; padding: 0 16px; font-size: 12px;">Xem đánh giá</button>
+      </div>
+    `;
+  } else {
+    reviewPanel.innerHTML = `
+      <div class="review-panel__card" style="text-align: center; display: grid; justify-items: center; gap: 8px;">
+        <h3 style="font-size: 15px; margin: 0;">Đánh giá dịch vụ giao hàng</h3>
+        <p style="margin: 0; color: var(--muted); font-size: 12px;">Đơn hàng đã giao thành công. Hãy dành ít phút để đánh giá dịch vụ nhé!</p>
         <button class="track-button btn-open-review-modal" style="min-height: 38px; padding: 0 16px; font-size: 12px; margin-top: 4px; background: var(--rose); color: var(--white);">Đánh giá ngay</button>
-      `}
-    </div>
-  `;
+      </div>
+    `;
+  }
 
   const openBtn = reviewPanel.querySelector('.btn-open-review-modal');
   if (openBtn) {
@@ -455,11 +459,24 @@ function openReviewModal(preparedResult, reviewData) {
   orderText.innerHTML = `Mã đơn hàng: <strong>${trackingCode}</strong>`;
 
   if (reviewData.reviewed) {
+    const ratingValue = Number(reviewData.rating !== undefined && reviewData.rating !== null ? reviewData.rating : 5);
+    const stars = "★".repeat(ratingValue) + "☆".repeat(5 - ratingValue);
     body.innerHTML = `
-      <div style="display: grid; gap: 12px; text-align: center;">
-        <div class="review-panel__badge" style="margin: 0 auto; background: var(--green); color: var(--white); font-weight: 800; border: 0; display: inline-flex; align-items: center; justify-content: center; min-height: 28px; padding: 0 10px; border-radius: 999px; font-size: 11px;">Đã đánh giá</div>
-        <p class="review-panel__message review-panel__message--success" style="font-weight: 600;">Đơn hàng này đã được đánh giá.</p>
-        <button type="button" class="track-button btn-close-modal" style="margin: 8px auto 0; min-height: 38px; padding: 0 22px; font-size: 14px; border-radius: 999px;">Đóng</button>
+      <div style="display: grid; gap: 14px; text-align: left; background: #fff8f5; border: 1px solid #efd2c8; padding: 16px; border-radius: 18px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #efd2c8; padding-bottom: 8px;">
+          <span style="font-weight: 700; color: var(--ink);">Đánh giá của bạn:</span>
+          <span class="review-panel__badge" style="background: var(--green); color: var(--white); font-weight: 800; border: 0; display: inline-flex; align-items: center; justify-content: center; min-height: 28px; padding: 0 10px; border-radius: 999px; font-size: 11px;">Đã đánh giá</span>
+        </div>
+        <div style="display: grid; gap: 6px;">
+          <span style="font-size: 13px; color: var(--muted); font-weight: 700;">Mức độ hài lòng:</span>
+          <strong style="font-size: 16px; color: #ff9800; letter-spacing: 2px;">${stars} <span style="font-size: 13px; color: var(--ink); font-weight: 800;">(${ratingValue} sao)</span></strong>
+        </div>
+        <div style="display: grid; gap: 6px;">
+          <span style="font-size: 13px; color: var(--muted); font-weight: 700;">Ghi chú đã gửi:</span>
+          <div style="background: #ffffff; border: 1px solid #e2c6ba; border-radius: 12px; padding: 10px 12px; font-size: 13px; color: var(--ink); min-height: 50px; line-height: 1.5; white-space: pre-wrap;">${reviewData.note || "Không có ghi chú nào."}</div>
+        </div>
+        <p class="review-panel__message review-panel__message--success" style="text-align: center; font-weight: 600; margin: 4px 0 0;">Đơn hàng này đã được đánh giá.</p>
+        <button type="button" class="track-button btn-close-modal" style="margin: 8px auto 0; min-height: 38px; padding: 0 22px; font-size: 14px; border-radius: 999px; width: 100%;">Đóng</button>
       </div>
     `;
     modal.hidden = false;
@@ -504,6 +521,11 @@ function openReviewModal(preparedResult, reviewData) {
   const cancelBtn = body.querySelector('#review-modal-cancel');
   const submitBtn = body.querySelector('#review-modal-submit');
   const textarea = body.querySelector('#review-modal-note');
+  if (textarea) {
+    textarea.addEventListener('input', () => {
+      textarea.value = textarea.value.replace(/[^\p{L}\p{N}\s.,?!()\-]/gu, '');
+    });
+  }
   const msgEl = body.querySelector('#review-modal-message');
   const ratingButtons = body.querySelectorAll('.review-rating__option');
 
@@ -552,6 +574,8 @@ function openReviewModal(preparedResult, reviewData) {
       const resData = await response.json();
       if (response.ok && resData.ok) {
         reviewData.reviewed = true;
+        reviewData.rating = selectedRating;
+        reviewData.note = textarea.value.trim();
         renderReviewForm(preparedResult, reviewData);
 
         body.innerHTML = `

@@ -52,7 +52,10 @@ export function extractReviewIdentity(result) {
 export function validateReviewSubmission(payload = {}) {
   const trackingCode = normalizeReviewCode(payload.trackingCode || payload.code);
   const numericRating = Number(payload.rating);
-  const note = String(payload.note || '').trim().slice(0, 1000);
+  const note = String(payload.note || '')
+    .replace(/[^\p{L}\p{N}\s.,?!()\-]/gu, '')
+    .trim()
+    .slice(0, 1000);
 
   if (!trackingCode || !/^[A-Z0-9._-]{4,40}$/i.test(trackingCode)) {
     return { ok: false, message: 'Mã đơn hàng không hợp lệ.' };

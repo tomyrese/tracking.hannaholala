@@ -23,8 +23,17 @@ function doGet(e) {
     if (!trackingCode) {
       return jsonResponse({ ok: false, message: "Thiếu mã đơn hàng." });
     }
-    const reviewed = checkIfReviewed(trackingCode);
-    return jsonResponse({ ok: true, reviewed: reviewed });
+    const reviewData = checkIfReviewed(trackingCode);
+    if (reviewData) {
+      return jsonResponse({
+        ok: true,
+        reviewed: true,
+        rating: reviewData.rating,
+        note: reviewData.note
+      });
+    } else {
+      return jsonResponse({ ok: true, reviewed: false });
+    }
   }
 
   return jsonResponse({ ok: false, message: "Hành động không hợp lệ." });
@@ -104,10 +113,10 @@ function doPost(e) {
 
 // Hàm kiểm tra mã đơn hàng đã có đánh giá trong Sheet chưa
 function checkIfReviewed(trackingCode) {
-  if (!trackingCode) return false;
+  if (!trackingCode) return null;
   const sheet = getOrCreateSheet();
   const data = sheet.getDataRange().getValues();
-  if (data.length <= 1) return false; // Chỉ có dòng tiêu đề
+  if (data.length <= 1) return null; // Chỉ có dòng tiêu đề
 
   const cleanCode = String(trackingCode).trim().toUpperCase();
 
@@ -115,10 +124,13 @@ function checkIfReviewed(trackingCode) {
   for (let i = 1; i < data.length; i++) {
     const cellValue = String(data[i][1]).trim().toUpperCase();
     if (cellValue === cleanCode) {
-      return true;
+      return {
+        rating: Number(data[i][5]),
+        note: String(data[i][6] || "")
+      };
     }
   }
-  return false;
+  return null;
 }
 
 // Lấy sheet DANHGIA hoặc tự động tạo nếu chưa có

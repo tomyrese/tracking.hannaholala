@@ -73,8 +73,8 @@ async function submitReview(fetchFn, webAppUrl, secret, payload) {
   return responsePayload || { ok: false, message: 'Không nhận được phản hồi từ dịch vụ đánh giá.' };
 }
 
-function buildDeliveredIdentityPayload(identity, reviewed) {
-  return {
+function buildDeliveredIdentityPayload(identity, reviewed, rating = null, note = null) {
+  const payload = {
     ok: true,
     delivered: true,
     reviewed,
@@ -84,6 +84,13 @@ function buildDeliveredIdentityPayload(identity, reviewed) {
     phone: identity.phone,
     message: reviewed ? 'Đơn hàng này đã được đánh giá.' : 'Bạn có thể đánh giá đơn hàng này.',
   };
+  if (rating !== null && rating !== undefined) {
+    payload.rating = rating;
+  }
+  if (note !== null && note !== undefined) {
+    payload.note = note;
+  }
+  return payload;
 }
 
 export async function handleReviewRequest({
@@ -132,7 +139,12 @@ export async function handleReviewRequest({
 
     const identity = extractReviewIdentity(result);
     const reviewStatus = await fetchReviewStatus(fetchFn, webAppUrl, secret, identity.trackingCode);
-    return json(200, buildDeliveredIdentityPayload(identity, Boolean(reviewStatus.reviewed)));
+    return json(200, buildDeliveredIdentityPayload(
+      identity,
+      Boolean(reviewStatus.reviewed),
+      reviewStatus.rating,
+      reviewStatus.note
+    ));
   }
 
   if (method !== 'POST') {
