@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 const GHN_BASE_URL = 'https://online-gateway.ghn.vn/shiip/public-api';
-const rootDir = fileURLToPath(new URL('..', import.meta.url));
+const rootDir = process.cwd();
 
 const statusLabels = {
   ready_to_pick: 'Chờ lấy hàng',
