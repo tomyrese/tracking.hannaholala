@@ -49,7 +49,6 @@ function doPost(e) {
   // 2. Thực hiện ghi đánh giá
   if (action === "submit") {
     const trackingCode = String(data.tracking_code || "").trim().toUpperCase();
-    const clientOrderCode = String(data.client_order_code || "").trim().toUpperCase();
     const orderCode = String(data.order_code || "").trim().toUpperCase();
     const phone = String(data.phone || "").trim();
     const status = String(data.status || "").trim();
@@ -82,7 +81,6 @@ function doPost(e) {
       sheet.appendRow([
         submittedAt,
         trackingCode,
-        clientOrderCode,
         orderCode,
         phone,
         status,
@@ -113,7 +111,7 @@ function checkIfReviewed(trackingCode) {
 
   const cleanCode = String(trackingCode).trim().toUpperCase();
 
-  // Cột 1 là submitted_at, Cột 2 là tracking_code (chỉ số mảng là 1)
+  // Cột 1 là Thời gian, Cột 2 là Mã đơn nội bộ (chỉ số mảng là 1)
   for (let i = 1; i < data.length; i++) {
     const cellValue = String(data[i][1]).trim().toUpperCase();
     if (cellValue === cleanCode) {
@@ -131,17 +129,16 @@ function getOrCreateSheet() {
     sheet = ss.insertSheet(SHEET_NAME);
     // Ghi hàng tiêu đề (Headers)
     sheet.appendRow([
-      "submitted_at",
-      "tracking_code",
-      "client_order_code",
-      "order_code",
-      "phone",
-      "status",
-      "rating",
-      "note"
+      "Thời gian",
+      "Mã đơn nội bộ",
+      "Mã vận đơn (GHN)",
+      "Số điện thoại",
+      "Trạng thái",
+      "Sao",
+      "Ghi chú"
     ]);
     // Format dòng tiêu đề cho đẹp mắt
-    sheet.getRange("A1:H1").setFontWeight("bold").setBackground("#f4e8e1");
+    sheet.getRange("A1:G1").setFontWeight("bold").setBackground("#f4e8e1");
   }
   return sheet;
 }
