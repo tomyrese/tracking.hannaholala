@@ -38,7 +38,7 @@ const LAND_THRESHOLD = 1.15;
 
 export function buildOsrmRouteUrl(points) {
   const encodedPoints = points.map((point) => `${point.lng},${point.lat}`).join(';');
-  return `https://router.project-osrm.org/route/v1/driving/${encodedPoints}?overview=full&geometries=geojson`;
+  return `https://routing.openstreetmap.de/routed-car/route/v1/driving/${encodedPoints}?overview=full&geometries=geojson`;
 }
 
 function toPoint(value) {
@@ -239,36 +239,42 @@ export async function buildRoute(fetchImpl, points, fallbackRoute = []) {
     return ensureVisibleRoute([], fallback);
   }
 
-  try {
-    const response = await fetchImpl(buildOsrmRouteUrl(routingPoints));
-    if (!response.ok) {
-      console.log('OSRM Response', { ok: response.ok, status: response.status ?? null });
+  const encodedPoints = routingPoints.map((point) => `${point.lng},${point.lat}`).join(';');
+  const urls = [
+    `https://routing.openstreetmap.de/routed-car/route/v1/driving/${encodedPoints}?overview=full&geometries=geojson`,
+    `https://router.project-osrm.org/route/v1/driving/${encodedPoints}?overview=full&geometries=geojson`
+  ];
+
+  for (const url of urls) {
+    try {
+      const response = await fetchImpl(url);
+      if (response.ok) {
+        const routeData = await response.json();
+        const coords = Array.isArray(routeData?.routes?.[0]?.geometry?.coordinates)
+          ? routeData.routes[0].geometry.coordinates.map(([lng, lat]) => [lat, lng])
+          : [];
+
+        console.log('OSRM Response', routeData);
+        console.log('Route Coordinates', coords);
+        console.log('Route Length', coords?.length ?? 0);
+
+        if (coords.length >= 2 && !routeLeavesVietnamMeaningfully(coords)) {
+          return ensureVisibleRoute(coords, fallback);
+        }
+      } else {
+        console.log('OSRM Response', { ok: response.ok, status: response.status ?? null });
+        console.log('Route Coordinates', []);
+        console.log('Route Length', 0);
+      }
+    } catch (error) {
+      console.error(error);
+      console.log('OSRM Response', null);
       console.log('Route Coordinates', []);
       console.log('Route Length', 0);
-      return ensureVisibleRoute([], fallback);
     }
-
-    const routeData = await response.json();
-    const coords = Array.isArray(routeData?.routes?.[0]?.geometry?.coordinates)
-      ? routeData.routes[0].geometry.coordinates.map(([lng, lat]) => [lat, lng])
-      : [];
-
-    console.log('OSRM Response', routeData);
-    console.log('Route Coordinates', coords);
-    console.log('Route Length', coords?.length ?? 0);
-
-    if (coords.length < 2 || routeLeavesVietnamMeaningfully(coords)) {
-      return ensureVisibleRoute([], fallback);
-    }
-
-    return ensureVisibleRoute(coords, fallback);
-  } catch (error) {
-    console.error(error);
-    console.log('OSRM Response', null);
-    console.log('Route Coordinates', []);
-    console.log('Route Length', 0);
-    return ensureVisibleRoute([], fallback);
   }
+
+  return ensureVisibleRoute([], fallback);
 }
 
 export async function fetchRoadRouteForPoints(fetchImpl, points, fallbackRoute = []) {

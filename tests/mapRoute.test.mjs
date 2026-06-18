@@ -18,7 +18,7 @@ test('builds an OSRM route url using lng,lat order', () => {
 
   assert.equal(
     url,
-    'https://router.project-osrm.org/route/v1/driving/106.5,10.5;106.8,10.8?overview=full&geometries=geojson',
+    'https://routing.openstreetmap.de/routed-car/route/v1/driving/106.5,10.5;106.8,10.8?overview=full&geometries=geojson',
   );
 });
 
