@@ -5,6 +5,7 @@ import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { trackShipment } from './src/trackingApi.mjs';
 import { generateSvgCaptcha, validateCaptcha } from './src/captcha.mjs';
+import { handleReviewRequest } from './src/reviewHandler.mjs';
 import { syncGhnOrders } from './src/sync.mjs';
 
 const root = fileURLToPath(new URL('.', import.meta.url));
@@ -88,6 +89,28 @@ async function handleApi(request, response, url) {
     return;
   }
 
+  if (url.pathname === '/api/submit-review') {
+    const body = request.method === 'POST'
+      ? await new Promise((resolve, reject) => {
+          const chunks = [];
+          request.on('data', (chunk) => chunks.push(chunk));
+          request.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+          request.on('error', reject);
+        })
+      : '';
+
+    const reviewResponse = await handleReviewRequest({
+      method: request.method,
+      query: Object.fromEntries(url.searchParams.entries()),
+      body,
+      env: process.env,
+    });
+
+    response.writeHead(reviewResponse.statusCode, reviewResponse.headers);
+    response.end(reviewResponse.body);
+    return;
+  }
+
   if (url.pathname !== '/api/track') {
     sendJson(response, 404, { ok: false, message: 'API route không tồn tại.' });
     return;
@@ -152,7 +175,7 @@ createServer(async (request, response) => {
     if (request.method === 'OPTIONS') {
       response.writeHead(204, {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET,OPTIONS',
+        'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
         'Access-Control-Allow-Headers': 'Content-Type',
       });
       response.end();

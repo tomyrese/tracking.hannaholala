@@ -35,3 +35,7 @@
   to = "/.netlify/functions/route"
   status = 200
 
+[[redirects]]
+  from = "/api/submit-review"
+  to = "/.netlify/functions/submit-review"
+  status = 200

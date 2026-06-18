@@ -4,6 +4,7 @@ import { buildRoute, VIETNAM_MAP_BOUNDS } from './mapRoute.mjs';
 import { createTrackingRouteManager } from './TrackingRouteManager.mjs';
 import { buildMarkerDisplayState, buildViewportFocusPoints } from './mapViewport.mjs';
 import { mountFeaturedProducts } from './components/featured-products.js';
+import { isDeliveredReviewableResult } from './reviewGateway.mjs';
 
 const icons = {
   check: '<path d="M20 6 9 17l-5-5"></path>',
@@ -25,6 +26,7 @@ const timeline = document.querySelector('[data-timeline]');
 const helperText = document.querySelector('[data-helper-text]');
 const trackButton = document.querySelector('.track-button');
 const backBtnContainer = document.querySelector('[data-back-btn-container]');
+const reviewPanel = document.querySelector('[data-review-panel]');
 
 let lastPhoneSearchResult = null;
 let activeResultCode = '';
@@ -226,6 +228,7 @@ function renderTimelineFromEvents(events, carrier) {
 }
 
 function renderReadyState(carrier) {
+  if (reviewPanel) reviewPanel.hidden = true;
   renderIdleMinimap();
   backBtnContainer.innerHTML = '';
   statusIcon.dataset.state = 'success';
@@ -239,6 +242,7 @@ function renderReadyState(carrier) {
 }
 
 function renderUnknownState(carrier) {
+  if (reviewPanel) reviewPanel.hidden = true;
   renderIdleMinimap();
   backBtnContainer.innerHTML = '';
   statusIcon.dataset.state = 'warning';
@@ -251,6 +255,7 @@ function renderUnknownState(carrier) {
 }
 
 function renderPhoneOrders(orders) {
+  if (reviewPanel) reviewPanel.hidden = true;
   renderIdleMinimap();
   if (!orders || orders.length === 0) {
     timeline.innerHTML = messageItem(
@@ -304,6 +309,7 @@ function renderPhoneOrders(orders) {
 }
 
 function renderIdleTrackingState() {
+  if (reviewPanel) reviewPanel.hidden = true;
   backBtnContainer.innerHTML = '';
   statusIcon.dataset.state = 'success';
   statusTitle.textContent = 'Sẵn sàng tra cứu';
@@ -323,6 +329,7 @@ function renderIdleTrackingState() {
 }
 
 async function renderApiResult(result) {
+  if (reviewPanel) reviewPanel.hidden = true;
   const carrier = result.carrier;
   const preparedResult = result?.type === 'live'
     ? {
@@ -339,7 +346,7 @@ async function renderApiResult(result) {
     statusTitle.textContent = `Tìm thấy ${preparedResult.orders.length} đơn hàng`;
     statusCode.textContent = `SĐT: ${preparedResult.phone}`;
     renderPhoneOrders(preparedResult.orders);
-    helperText.innerHTML = `Đã tìm kiếm thành công danh sách đơn hàng cho SĐT ${preparedResult.phone}.`;
+    helperText.innerHTML = `Đã tìm kiếm thành công danh sách đơn hàng cho SĐT ${lastPhoneSearchResult.phone}.`;
     return;
   }
 
@@ -371,6 +378,154 @@ async function renderApiResult(result) {
   helperText.innerHTML = isLive
     ? `${cleanMsg || 'Đã lấy dữ liệu hành trình.'}`
     : `${cleanMsg || 'Chưa thể lấy dữ liệu.'}${preparedResult.lookupUrl ? ` · <a href="${preparedResult.lookupUrl}" target="_blank" rel="noreferrer">Tra cứu bên ngoài</a>` : ''}`;
+
+  if (isLive && isDeliveredReviewableResult(preparedResult) && reviewPanel) {
+    const trackingCode = preparedResult.clientOrderCode || preparedResult.code;
+    const checkUrl = new URL('/api/submit-review', apiBaseUrl());
+    checkUrl.searchParams.set('code', trackingCode);
+    
+    reviewPanel.hidden = false;
+    reviewPanel.innerHTML = `
+      <div class="review-panel__card">
+        <h3>Đánh giá đơn hàng</h3>
+        <p>Đang kiểm tra trạng thái đánh giá...</p>
+      </div>
+    `;
+    
+    try {
+      const res = await fetch(checkUrl);
+      const data = await res.json();
+      if (res.ok && data.ok) {
+        renderReviewForm(preparedResult, data);
+      } else {
+        if (data && data.reviewed) {
+          renderReviewForm(preparedResult, data);
+        } else {
+          reviewPanel.hidden = true;
+        }
+      }
+    } catch (err) {
+      console.error('Error checking review status:', err);
+      reviewPanel.innerHTML = `
+        <div class="review-panel__card">
+          <h3>Đánh giá đơn hàng</h3>
+          <p class="review-panel__message review-panel__message--error">Không thể kiểm tra trạng thái đánh giá.</p>
+        </div>
+      `;
+    }
+  }
+}
+
+function renderReviewForm(preparedResult, reviewData) {
+  if (!reviewPanel) return;
+
+  const trackingCode = reviewData.trackingCode || preparedResult.clientOrderCode || preparedResult.code;
+
+  reviewPanel.innerHTML = `
+    <div class="review-panel__card">
+      <h3>Đánh giá dịch vụ giao hàng</h3>
+      <p>Mã đơn hàng: <strong>${trackingCode}</strong></p>
+      
+      ${reviewData.reviewed ? `
+        <div class="review-panel__badge">Đã đánh giá</div>
+        <p class="review-panel__message review-panel__message--success">Đơn hàng này đã được đánh giá.</p>
+      ` : `
+        <form class="review-panel__form">
+          <div class="review-panel__field">
+            <span>Chọn mức độ hài lòng:</span>
+            <div class="review-rating">
+              <button type="button" class="review-rating__option" data-rating="5">★★★★★ 5 sao</button>
+              <button type="button" class="review-rating__option" data-rating="4">★★★★☆ 4 sao</button>
+              <button type="button" class="review-rating__option" data-rating="3">★★★☆☆ 3 sao</button>
+              <button type="button" class="review-rating__option" data-rating="2">★★☆☆☆ 2 sao</button>
+              <button type="button" class="review-rating__option" data-rating="1">★☆☆☆☆ 1 sao</button>
+              <button type="button" class="review-rating__option" data-rating="0">☆☆☆☆☆ 0 sao</button>
+            </div>
+          </div>
+          <div class="review-panel__field">
+            <span>Ghi chú đánh giá:</span>
+            <textarea placeholder="Nhập ý kiến đóng góp của bạn về dịch vụ giao hàng (tối đa 1000 ký tự)..." maxlength="1000"></textarea>
+          </div>
+          <p class="review-panel__message" style="display: none;"></p>
+          <button type="submit" class="track-button" style="width: 100%;" disabled>Gửi đánh giá</button>
+        </form>
+      `}
+    </div>
+  `;
+
+  if (reviewData.reviewed) return;
+
+  const form = reviewPanel.querySelector('.review-panel__form');
+  if (!form) return;
+
+  let selectedRating = null;
+  const ratingButtons = form.querySelectorAll('.review-rating__option');
+  const submitBtn = form.querySelector('button[type="submit"]');
+  const textarea = form.querySelector('textarea');
+  const msgEl = form.querySelector('.review-panel__message');
+
+  ratingButtons.forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.preventDefault();
+      selectedRating = Number(btn.dataset.rating);
+      ratingButtons.forEach((b) => b.classList.toggle('is-selected', b === btn));
+      submitBtn.disabled = false;
+    });
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (selectedRating === null) return;
+
+    // Disable inputs during submit
+    submitBtn.disabled = true;
+    textarea.disabled = true;
+    ratingButtons.forEach((b) => b.disabled = true);
+
+    msgEl.textContent = 'Đang gửi đánh giá...';
+    msgEl.className = 'review-panel__message';
+    msgEl.style.display = 'block';
+
+    try {
+      const submitUrl = new URL('/api/submit-review', apiBaseUrl());
+      const response = await fetch(submitUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          trackingCode: trackingCode,
+          rating: selectedRating,
+          note: textarea.value.trim(),
+        }),
+      });
+
+      const resData = await response.json();
+      if (response.ok && resData.ok) {
+        // Render success state
+        reviewPanel.querySelector('.review-panel__card').innerHTML = `
+          <h3>Đánh giá dịch vụ giao hàng</h3>
+          <p>Mã đơn hàng: <strong>${trackingCode}</strong></p>
+          <div class="review-panel__badge">Đã đánh giá</div>
+          <p class="review-panel__message review-panel__message--success">Cảm ơn bạn đã gửi đánh giá cho đơn hàng này.</p>
+        `;
+      } else {
+        // Show error and re-enable inputs
+        msgEl.textContent = resData.message || 'Có lỗi xảy ra khi gửi đánh giá.';
+        msgEl.className = 'review-panel__message review-panel__message--error';
+        submitBtn.disabled = false;
+        textarea.disabled = false;
+        ratingButtons.forEach((b) => b.disabled = false);
+      }
+    } catch (err) {
+      console.error('Submit review error:', err);
+      msgEl.textContent = 'Không thể kết nối tới máy chủ.';
+      msgEl.className = 'review-panel__message review-panel__message--error';
+      submitBtn.disabled = false;
+      textarea.disabled = false;
+      ratingButtons.forEach((b) => b.disabled = false);
+    }
+  });
 }
 
 function updateDetection(rawCode) {

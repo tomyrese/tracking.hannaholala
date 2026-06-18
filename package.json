@@ -5,6 +5,6 @@
   "scripts": {
     "start": "node server.mjs",
     "build": "node build.mjs",
-    "test": "node --test tests/checkGhnUpdates.test.mjs tests/mapJourney.test.mjs tests/mapMarkers3d.test.mjs tests/mapRoute.test.mjs tests/mapStyles.test.mjs tests/mapViewport.test.mjs tests/parser.test.mjs tests/sync.test.mjs tests/trackingApiTimeline.test.mjs tests/trackingHeaderLayout.test.mjs tests/vietnameseCopy.test.mjs tests/geocodingFallback.test.mjs"
+    "test": "node --test tests/checkGhnUpdates.test.mjs tests/mapJourney.test.mjs tests/mapMarkers3d.test.mjs tests/mapRoute.test.mjs tests/mapStyles.test.mjs tests/mapViewport.test.mjs tests/parser.test.mjs tests/reviewFlow.test.mjs tests/sync.test.mjs tests/trackingApiTimeline.test.mjs tests/trackingHeaderLayout.test.mjs tests/vietnameseCopy.test.mjs tests/geocodingFallback.test.mjs"
   }
 }

@@ -581,6 +581,129 @@ h1 {
   padding-right: 8px;
 }
 
+.review-panel[hidden] {
+  display: none !important;
+}
+
+.review-panel {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(234, 216, 208, 0.9);
+}
+
+.review-panel__card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  background: #fff8f5;
+  border: 1px solid #efd2c8;
+  border-radius: 18px;
+  box-shadow: 0 8px 18px rgba(82, 51, 42, 0.06);
+}
+
+.review-panel__card h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.review-panel__card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.review-panel__form {
+  display: grid;
+  gap: 12px;
+}
+
+.review-rating {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.review-rating__option {
+  min-height: 36px;
+  padding: 0 12px;
+  color: #6f554b;
+  background: #ffffff;
+  border: 1px solid #e2c6ba;
+  border-radius: 999px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  transition: transform 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.review-rating__option:hover,
+.review-rating__option.is-selected {
+  color: var(--white);
+  background: var(--ink);
+  border-color: var(--ink);
+  transform: translateY(-1px);
+}
+
+.review-panel__field {
+  display: grid;
+  gap: 6px;
+}
+
+.review-panel__field span {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.review-panel__field textarea {
+  width: 100%;
+  min-height: 92px;
+  padding: 12px 14px;
+  resize: vertical;
+  color: var(--ink);
+  background: #ffffff;
+  border: 1px solid #e2c6ba;
+  border-radius: 16px;
+  font: inherit;
+  outline: 0;
+}
+
+.review-panel__field textarea:focus {
+  border-color: var(--ink);
+}
+
+.review-panel__message {
+  min-height: 18px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.review-panel__message--error {
+  color: var(--rose);
+}
+
+.review-panel__message--success {
+  color: var(--green);
+}
+
+.review-panel__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  min-height: 28px;
+  padding: 0 10px;
+  color: #6f554b;
+  background: var(--beige);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
 .timeline::-webkit-scrollbar {
   width: 6px;
 }
