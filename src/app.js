@@ -1244,25 +1244,23 @@ function createVehicleMarkerIcon({ emoji, hidden = false }) {
 }
 
 function createRecipientMarkerIcon({ delivered = false } = {}) {
-  const pinColor = '#2196f3';
   return L.divIcon({
     html: `
       <span class="map-marker map-marker--recipient" style="width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; position: relative;">
-        <!-- The dot in the background (centered at bottom tip) -->
-        <span class="map-checkpoint-dot ${delivered ? 'map-checkpoint-dot--completed' : 'map-checkpoint-dot--upcoming'}" style="position: absolute; bottom: -5px; left: 11px; width: 10px; height: 10px; z-index: 1;"></span>
+        <!-- The dot in the background (centered) -->
+        <span class="map-checkpoint-dot ${delivered ? 'map-checkpoint-dot--completed' : 'map-checkpoint-dot--upcoming'}" style="position: absolute; bottom: 11px; left: 11px; width: 10px; height: 10px; z-index: 1;"></span>
         
-        <!-- The SVG pin on top of the dot -->
-        <svg viewBox="0 0 24 24" fill="${pinColor}" style="position: absolute; top: 0; left: 0; width: 32px; height: 32px; display: block; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.25)); z-index: 2;">
-          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-        </svg>
+        <!-- The emoji pin on top of the dot -->
+        <span class="map-marker__glyph" style="font-size: 24px; position: absolute; z-index: 2; line-height: 1; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.25));">📍</span>
+        
         ${delivered ? '<span class="map-marker__badge" style="top: -2px; right: -2px; width: 15px; height: 15px; font-size: 9px; display: flex; align-items: center; justify-content: center; z-index: 3;">✓</span>' : ''}
         <span class="receiver-marker__box" style="display: none !important;"></span>
       </span>
     `,
     className: 'map-marker-wrap',
     iconSize: [32, 32],
-    iconAnchor: [16, 32],
-    popupAnchor: [0, -32],
+    iconAnchor: [16, 16],
+    popupAnchor: [0, -20],
   });
 }
 
