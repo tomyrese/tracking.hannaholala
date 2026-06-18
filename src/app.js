@@ -23,7 +23,12 @@ const statusCode = document.querySelector('[data-status-code]');
 const statusTitle = document.querySelector('[data-status-title]');
 const statusIcon = document.querySelector('[data-status-icon]');
 const timeline = document.querySelector('[data-timeline]');
-const helperText = document.querySelector('[data-helper-text]');
+const helperText = {
+  set innerHTML(val) {},
+  get innerHTML() { return ''; },
+  set textContent(val) {},
+  get textContent() { return ''; }
+};
 const trackButton = document.querySelector('.track-button');
 const backBtnContainer = document.querySelector('[data-back-btn-container]');
 const reviewPanel = document.querySelector('[data-review-panel]');
