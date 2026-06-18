@@ -230,6 +230,7 @@ function renderTimelineFromEvents(events, carrier) {
 
 function renderReadyState(carrier) {
   if (reviewPanel) reviewPanel.hidden = true;
+  if (discountPanel) discountPanel.hidden = true;
   renderIdleMinimap();
   backBtnContainer.innerHTML = '';
   statusIcon.dataset.state = 'success';
@@ -244,6 +245,7 @@ function renderReadyState(carrier) {
 
 function renderUnknownState(carrier) {
   if (reviewPanel) reviewPanel.hidden = true;
+  if (discountPanel) discountPanel.hidden = true;
   renderIdleMinimap();
   backBtnContainer.innerHTML = '';
   statusIcon.dataset.state = 'warning';
@@ -257,6 +259,7 @@ function renderUnknownState(carrier) {
 
 function renderPhoneOrders(orders) {
   if (reviewPanel) reviewPanel.hidden = true;
+  if (discountPanel) discountPanel.hidden = true;
   renderIdleMinimap();
   if (!orders || orders.length === 0) {
     timeline.innerHTML = messageItem(
@@ -311,6 +314,7 @@ function renderPhoneOrders(orders) {
 
 function renderIdleTrackingState() {
   if (reviewPanel) reviewPanel.hidden = true;
+  if (discountPanel) discountPanel.hidden = true;
   backBtnContainer.innerHTML = '';
   statusIcon.dataset.state = 'success';
   statusTitle.textContent = 'Sẵn sàng tra cứu';
@@ -331,6 +335,7 @@ function renderIdleTrackingState() {
 
 async function renderApiResult(result) {
   if (reviewPanel) reviewPanel.hidden = true;
+  if (discountPanel) discountPanel.hidden = true;
   const carrier = result.carrier;
   const preparedResult = result?.type === 'live'
     ? {
