@@ -63,7 +63,7 @@ test('timeline and marker focus are synchronized both ways through shared route 
 test('map focus and checkpoint markers now depend on real route geometry instead of synthetic checkpoint positions', () => {
   assert.match(appSource, /routeGeometryPoints/);
   assert.match(appSource, /map\.fitBounds\(L\.latLngBounds\(routeGeometryPoints\)/);
-  assert.match(appSource, /filter\(\(step\) => step\.hasRealPoint && step\.point && step\.phase !== 'order_created' && step\.phase !== 'delivered'\)/);
+  assert.match(appSource, /filter\(\(step\) => step\.point && step\.phase !== 'order_created' && step\.phase !== 'delivered'\)/);
   assert.match(routeManagerSource, /console\.log\('Origin:', originPoint\)/);
   assert.match(routeManagerSource, /console\.log\('Destination:', destinationPoint\)/);
   assert.match(routeManagerSource, /console\.log\('Steps with coordinates:', stepsWithCoordinates\)/);

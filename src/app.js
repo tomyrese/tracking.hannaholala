@@ -1244,24 +1244,21 @@ function createVehicleMarkerIcon({ emoji }) {
 }
 
 function createRecipientMarkerIcon({ delivered = false } = {}) {
+  const pinColor = '#d9485f';
   return L.divIcon({
-    html: delivered
-      ? `
-        <span class="map-marker map-marker--recipient map-marker--recipient-delivered">
-          <span class="map-marker__glyph">🙋</span>
-          <span class="map-marker__badge">✓</span>
-          <span class="receiver-marker__box" style="display: none !important;"></span>
-        </span>
-      `
-      : `
-        <span class="map-marker map-marker--recipient">
-          <span class="map-marker__glyph">🙋</span>
-        </span>
-      `,
+    html: `
+      <span class="map-marker map-marker--recipient" style="width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; position: relative;">
+        <svg viewBox="0 0 24 24" fill="${pinColor}" style="width: 32px; height: 32px; display: block; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.25));">
+          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+        </svg>
+        ${delivered ? '<span class="map-marker__badge" style="top: -2px; right: -2px; width: 15px; height: 15px; font-size: 9px; display: flex; align-items: center; justify-content: center;">✓</span>' : ''}
+        <span class="receiver-marker__box" style="display: none !important;"></span>
+      </span>
+    `,
     className: 'map-marker-wrap',
-    iconSize: [40, 40],
-    iconAnchor: [20, 20],
-    popupAnchor: [0, -24],
+    iconSize: [32, 32],
+    iconAnchor: [16, 32],
+    popupAnchor: [0, -32],
   });
 }
 
@@ -1269,15 +1266,13 @@ function createLogisticsNodeIcon(kind = 'start') {
   if (kind === 'start') {
     return L.divIcon({
       html: `
-        <span class="map-marker map-marker--origin">
-          <span class="map-marker__glyph">🏬</span>
-          <span class="map-route-node map-route-node--start" style="display: none !important;"></span>
-        </span>
+        <span class="map-checkpoint-dot map-checkpoint-dot--completed" style="width: 14px; height: 14px; background: var(--muted); border: 2.5px solid #ffffff; border-radius: 50%; box-shadow: 0 2px 4px rgba(82, 51, 42, 0.25); display: block;"></span>
+        <span class="map-route-node map-route-node--start" style="display: none !important;"></span>
       `,
-      className: 'map-marker-wrap',
-      iconSize: [40, 40],
-      iconAnchor: [20, 20],
-      popupAnchor: [0, -24],
+      className: 'map-checkpoint-dot-wrap',
+      iconSize: [14, 14],
+      iconAnchor: [7, 7],
+      popupAnchor: [0, -10],
     });
   }
 
@@ -1817,7 +1812,7 @@ async function renderSegmentedJourney(journey, preparedRoute = null) {
   }).addTo(leafletMap);
 
   checkpointMarkers = manager.timelineSteps
-    .filter((step) => step.hasRealPoint && step.point && step.phase !== 'order_created' && step.phase !== 'delivered')
+    .filter((step) => step.point && step.phase !== 'order_created' && step.phase !== 'delivered')
     .map((step, visualIndex) => {
       const timelineIndex = manager.timelineSteps.findIndex((entry) => entry.stepIndex === step.stepIndex);
       const marker = L.marker([step.point.lat, step.point.lng], {
