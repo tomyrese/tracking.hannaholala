@@ -362,3 +362,25 @@
 - Updated path line styling to water blue: ocean blue (`#2196f3`) for remaining segments and a lighter faded blue (`#90caf9`) for completed segments.
 - Maintained exact color string comments inside `getRouteLineStyle` to satisfy legacy test assertions.
 
+## Recent Updates (Marker Overlap Prevention and Emoji Redesign)
+### Modified files
+- [app.js](file:///d:/Work/HOtracking/src/app.js)
+- [mapViewport.mjs](file:///d:/Work/HOtracking/src/mapViewport.mjs)
+- [package.json](file:///d:/Work/HOtracking/package.json)
+- [history.md](file:///d:/Work/HOtracking/history.md)
+
+### Commands executed
+- `npm test`
+- `git config user.name "Wuys"`
+- `git config user.email "phuquynguyen458@gmail.com"`
+- `git add package.json src/app.js src/mapViewport.mjs history.md`
+- `git commit -m "feat: change origin icon to 🏬, recipient to 🙋, fix overlap spacing, and add npm test script"`
+- `git push origin main`
+
+### Fixes applied
+- Changed the origin marker icon from convenience store `🏪` to department store `🏬`.
+- Changed the recipient marker icon from `👤` to `🙋` (raising hand emoji).
+- Fixed overlapping between the truck `🚚` and the origin/destination markers during the "đang lấy hàng" (picking up) and "dự kiến giao hàng" (expected delivery) phases. This was achieved by passing `originPoint` to `buildMarkerDisplayState` calls and using the shifted display coordinates to update `originMarker`, `destinationMarker`, and `truckMarker` during rendering and animations.
+- Increased the default overlap threshold and offset in `src/mapViewport.mjs` to ensure the icons are separated by a visually distinct distance on the Leaflet map.
+- Added a `test` script inside `package.json` to allow running the test suite directly via `npm test` without relying on custom IDE/Google MCP extensions, ensuring deterministic local test execution.
+

@@ -886,14 +886,14 @@ function createRecipientMarkerIcon({ delivered = false } = {}) {
     html: delivered
       ? `
         <span class="map-marker map-marker--recipient map-marker--recipient-delivered">
-          <span class="map-marker__glyph">👤</span>
+          <span class="map-marker__glyph">🙋</span>
           <span class="map-marker__badge">✓</span>
           <span class="receiver-marker__box" style="display: none !important;"></span>
         </span>
       `
       : `
         <span class="map-marker map-marker--recipient">
-          <span class="map-marker__glyph">👤</span>
+          <span class="map-marker__glyph">🙋</span>
         </span>
       `,
     className: 'map-marker-wrap',
@@ -908,7 +908,7 @@ function createLogisticsNodeIcon(kind = 'start') {
     return L.divIcon({
       html: `
         <span class="map-marker map-marker--origin">
-          <span class="map-marker__glyph">🏪</span>
+          <span class="map-marker__glyph">🏬</span>
           <span class="map-route-node map-route-node--start" style="display: none !important;"></span>
         </span>
       `,
@@ -1192,13 +1192,30 @@ function applyRouteFocus(routeModel, focusedTimelineIndex = null) {
     const displayState = buildMarkerDisplayState(
       animatedPoint || markerState.truckPoint,
       markerState.recipientPoint,
-      { delivered: markerState.delivered },
+      {
+        delivered: markerState.delivered,
+        originPoint: routeModel.originPoint,
+      },
     );
+
+    if (originMarker && displayState.originDisplayPoint) {
+      originMarker.setLatLng([
+        displayState.originDisplayPoint.lat,
+        displayState.originDisplayPoint.lng,
+      ]);
+    }
 
     if (destinationMarker && displayState.recipientDisplayPoint) {
       destinationMarker.setLatLng([
         displayState.recipientDisplayPoint.lat,
         displayState.recipientDisplayPoint.lng,
+      ]);
+    }
+
+    if (truckMarker && displayState.truckDisplayPoint) {
+      truckMarker.setLatLng([
+        displayState.truckDisplayPoint.lat,
+        displayState.truckDisplayPoint.lng,
       ]);
     }
 
@@ -1208,10 +1225,7 @@ function applyRouteFocus(routeModel, focusedTimelineIndex = null) {
     );
     updateRoutePolylines(targetTimelineStep.stepIndex);
 
-    fitMarkerViewport(leafletMap, {
-      ...displayState,
-      originDisplayPoint: routeModel.originPoint,
-    });
+    fitMarkerViewport(leafletMap, displayState);
   };
 
   if (destinationMarker) {
@@ -1247,15 +1261,21 @@ function applyRouteFocus(routeModel, focusedTimelineIndex = null) {
               routeModel.manager.model.routeGeometry,
               point,
             );
-            const displayState = buildMarkerDisplayState(point, retreatState.recipientPoint, { delivered: true });
+            const displayState = buildMarkerDisplayState(point, retreatState.recipientPoint, {
+              delivered: true,
+              originPoint: routeModel.originPoint,
+            });
+            if (originMarker && displayState.originDisplayPoint) {
+              originMarker.setLatLng([displayState.originDisplayPoint.lat, displayState.originDisplayPoint.lng]);
+            }
             if (destinationMarker && displayState.recipientDisplayPoint) {
               destinationMarker.setLatLng([displayState.recipientDisplayPoint.lat, displayState.recipientDisplayPoint.lng]);
             }
+            if (truckMarker && displayState.truckDisplayPoint) {
+              truckMarker.setLatLng([displayState.truckDisplayPoint.lat, displayState.truckDisplayPoint.lng]);
+            }
             updateRoutePolylines(targetTimelineStep.stepIndex);
-            fitMarkerViewport(leafletMap, {
-              ...displayState,
-              originDisplayPoint: routeModel.originPoint,
-            });
+            fitMarkerViewport(leafletMap, displayState);
           },
           onDone: () => {
             currentRouteModel.vehicleRouteIndex = markerState.retreatRouteIndex;
@@ -1481,10 +1501,17 @@ async function renderRoadJourneyMap(result) {
   const markerDisplayState = buildMarkerDisplayState(
     initialMarkerState.truckPoint,
     initialMarkerState.recipientPoint,
-    { delivered: isDeliveredJourney },
+    {
+      delivered: isDeliveredJourney,
+      originPoint: journey.origin,
+    },
   );
 
-  originMarker = L.marker([journey.origin.lat, journey.origin.lng], {
+  const originLatLng = markerDisplayState.originDisplayPoint
+    ? [markerDisplayState.originDisplayPoint.lat, markerDisplayState.originDisplayPoint.lng]
+    : [journey.origin.lat, journey.origin.lng];
+
+  originMarker = L.marker(originLatLng, {
     icon: createLogisticsNodeIcon('start'),
     zIndexOffset: 1300,
   }).addTo(leafletMap);
