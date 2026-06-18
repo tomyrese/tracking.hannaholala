@@ -8,9 +8,9 @@ const routeManagerSource = readFileSync(new URL('../src/TrackingRouteManager.mjs
 
 test('map render uses emoji markers and the new tracking route manager', () => {
   assert.match(appSource, /createTrackingRouteManager/);
-  assert.match(appSource, /emoji:\s*'🚚📦'/);
-  assert.match(appSource, /emoji:\s*'🤵‍♂️'/);
-  assert.match(appSource, /createDeliveredRecipientIcon/);
+  assert.match(appSource, /createVehicleMarkerIcon/);
+  assert.match(appSource, /createRecipientMarkerIcon/);
+  assert.match(appSource, /fetchRoadRouteForPoints/);
   assert.match(appSource, /createLogisticsNodeIcon/);
   assert.match(appSource, /let animFrameId = null;/);
   assert.doesNotMatch(appSource, /navigator\.geolocation/);
@@ -45,13 +45,14 @@ test('timeline and marker focus are synchronized both ways through shared route 
   assert.match(appSource, /destinationMarker\.on\('click'/);
 });
 
-test('truck movement animates smoothly along the route instead of teleporting between steps', () => {
+test('truck movement animates smoothly along the route without rotating the emoji glyph', () => {
   assert.match(appSource, /function animateMarkerAlongPath\(marker,\s*pathPoints/);
   assert.match(appSource, /requestAnimationFrame\(tick\)/);
   assert.match(appSource, /duration = 1200/);
   assert.match(appSource, /const eased = 1 - \(\(1 - progress\) \*\* 3\)/);
   assert.match(appSource, /setVehicleMarkerAngle\(marker,\s*getBearing/);
-  assert.match(appSource, /angleOffset = 0/);
+  assert.match(appSource, /map-emoji-marker__direction/);
+  assert.doesNotMatch(appSource, /map-emoji-marker__glyph'\)\.style\.transform/);
 });
 
 test('delivered flow keeps separate logistics nodes and includes the truck retreat animation', () => {
@@ -62,12 +63,13 @@ test('delivered flow keeps separate logistics nodes and includes the truck retre
   assert.match(appSource, /angleOffset:\s*180/);
 });
 
-test('styles define current, past, and future timeline states, vehicle glyph rotation, and logistics nodes', () => {
+test('styles define current, past, and future timeline states, direction arrow, receiver badge, and logistics nodes', () => {
   assert.match(styles, /\.timeline__map-hint/);
   assert.match(styles, /\.timeline__item--past/);
   assert.match(styles, /\.timeline__item--current/);
   assert.match(styles, /\.timeline__item--future/);
-  assert.match(styles, /\.map-emoji-marker__glyph/);
+  assert.match(styles, /\.map-emoji-marker__direction/);
+  assert.match(styles, /\.receiver-marker__box/);
   assert.match(styles, /\.map-route-node--start/);
   assert.match(styles, /\.map-route-node--end/);
 });

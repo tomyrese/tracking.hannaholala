@@ -82,6 +82,64 @@ function buildVietnamFallbackRoute(start, end) {
   ];
 }
 
+function mergeRouteSegments(segments) {
+  const merged = [];
+
+  for (const segment of segments) {
+    for (const point of segment) {
+      const last = merged[merged.length - 1];
+      if (!last || last[0] !== point[0] || last[1] !== point[1]) {
+        merged.push(point);
+      }
+    }
+  }
+
+  return merged;
+}
+
+function buildVietnamFallbackRouteForPoints(points, fallbackRoute = []) {
+  if (!Array.isArray(points) || points.length < 2) {
+    return fallbackRoute;
+  }
+
+  const segments = [];
+  for (let index = 0; index < points.length - 1; index += 1) {
+    segments.push(buildVietnamFallbackRoute(points[index], points[index + 1]));
+  }
+
+  return mergeRouteSegments(segments);
+}
+
+export async function fetchRoadRouteForPoints(fetchImpl, points, fallbackRoute = []) {
+  if (!Array.isArray(points) || points.length < 2) {
+    return fallbackRoute;
+  }
+
+  const fallback = buildVietnamFallbackRouteForPoints(points, fallbackRoute);
+
+  try {
+    const response = await fetchImpl(buildOsrmRouteUrl(points));
+    if (!response.ok) {
+      return fallback;
+    }
+
+    const data = await response.json();
+    const coordinates = data?.routes?.[0]?.geometry?.coordinates;
+    if (!Array.isArray(coordinates) || coordinates.length < 2) {
+      return fallback;
+    }
+
+    const mappedCoordinates = coordinates.map(([lng, lat]) => [lat, lng]);
+    if (routeLeavesVietnamMeaningfully(mappedCoordinates)) {
+      return fallback;
+    }
+
+    return mappedCoordinates;
+  } catch {
+    return fallback;
+  }
+}
+
 export async function fetchRoadRoute(fetchImpl, start, end) {
   if (!start || !end) {
     return [];

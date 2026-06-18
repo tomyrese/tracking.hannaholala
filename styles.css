@@ -1117,29 +1117,52 @@ h1 {
 }
 
 .map-emoji-marker {
-  display: inline-grid;
-  place-items: center;
-  width: 42px;
-  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
   border: 2px solid rgba(255, 255, 255, 0.96);
   box-shadow: 0 12px 22px rgba(45, 34, 30, 0.18);
   font-size: 22px;
   line-height: 1;
   background: rgba(255, 255, 255, 0.94);
+  position: relative;
 }
 
 .map-emoji-marker__glyph {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transform-origin: center;
-  transition: transform 180ms ease;
-  will-change: transform;
 }
 
-.map-emoji-marker--truck {
-  background: linear-gradient(180deg, #2d2d2d 0%, #111 100%);
+.map-emoji-marker--vehicle {
+  background: linear-gradient(180deg, #ffffff 0%, #f7efe9 100%);
+}
+
+.map-emoji-marker__direction {
+  position: absolute;
+  right: -6px;
+  bottom: 4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: #24201d;
+  box-shadow: 0 4px 10px rgba(36, 32, 29, 0.2);
+}
+
+.map-emoji-marker__direction::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 6px solid #fff;
+  transform: translate(-35%, -50%);
 }
 
 .map-emoji-marker--recipient {
@@ -1147,18 +1170,37 @@ h1 {
 }
 
 .map-emoji-marker--recipient-delivered {
-  width: 54px;
-  padding: 0 10px;
-  font-size: 19px;
-  letter-spacing: 0.02em;
+  width: 52px;
+  height: 52px;
 }
 
-.map-emoji-marker__duo {
+.receiver-marker {
   display: inline-flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 2px;
-  white-space: nowrap;
+  position: relative;
+}
+
+.receiver-marker__person {
+  display: block;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.receiver-marker__box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #fff2dc;
+  box-shadow: 0 2px 8px rgba(82, 51, 42, 0.12);
+  font-size: 12px;
+  line-height: 1;
 }
 
 .map-route-node-wrap {

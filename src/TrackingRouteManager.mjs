@@ -54,6 +54,13 @@ function distanceBetween(a, b) {
   return Math.sqrt((deltaLat ** 2) + (deltaLng ** 2));
 }
 
+function distanceSquared(a, b) {
+  if (!a || !b) return Infinity;
+  const deltaLat = b.lat - a.lat;
+  const deltaLng = b.lng - a.lng;
+  return (deltaLat ** 2) + (deltaLng ** 2);
+}
+
 function quadraticBezier(start, control, end, t) {
   const inverse = 1 - t;
   return {
@@ -193,6 +200,7 @@ export class TrackingRouteManager {
     const virtualizedSteps = this.generateVirtualPoints(stepsChronological);
     const routeAnchors = this.generateAnchorPoints(virtualizedSteps);
     const visualRoute = this.generateVisualRoute(routeAnchors);
+    this.routeAnchors = routeAnchors;
 
     this.stepsChronological = virtualizedSteps;
     this.timelineSteps = [...virtualizedSteps].sort((a, b) => b.stepIndex - a.stepIndex);
@@ -219,6 +227,54 @@ export class TrackingRouteManager {
       isCollapsed: pointsEqual(currentPoint, destinationPoint),
       isNearDestination: this.isNearPoint(currentPoint, destinationPoint),
     };
+  }
+
+  setRouteGeometry(routePoints) {
+    if (!Array.isArray(routePoints) || routePoints.length < 2) return;
+
+    const normalizedPoints = routePoints.map((point) =>
+      Array.isArray(point)
+        ? { lat: Number(point[0]), lng: Number(point[1]) }
+        : { lat: Number(point.lat), lng: Number(point.lng) }
+    ).filter((point) => Number.isFinite(point.lat) && Number.isFinite(point.lng));
+
+    if (normalizedPoints.length < 2) return;
+
+    const routeIndexByStep = new Map();
+    if (this.routeAnchors?.length) {
+      for (const anchor of this.routeAnchors) {
+        const nearestIndex = this.findNearestRouteIndex(normalizedPoints, anchor.point);
+        if (anchor.kind === 'step') {
+          routeIndexByStep.set(anchor.stepIndex, nearestIndex);
+        }
+        if (anchor.kind === 'destination') {
+          routeIndexByStep.set('destination', nearestIndex);
+        }
+      }
+    }
+
+    this.model = {
+      ...this.model,
+      routeGeometry: normalizedPoints,
+      routeGeometryByStep: routeIndexByStep,
+      originRouteIndex: 0,
+      destinationRouteIndex: normalizedPoints.length - 1,
+    };
+  }
+
+  findNearestRouteIndex(routePoints, point) {
+    let bestIndex = 0;
+    let bestDistance = Infinity;
+
+    routePoints.forEach((candidate, index) => {
+      const currentDistance = distanceSquared(candidate, point);
+      if (currentDistance < bestDistance) {
+        bestDistance = currentDistance;
+        bestIndex = index;
+      }
+    });
+
+    return bestIndex;
   }
 
   generateVirtualPoints(steps) {

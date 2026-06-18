@@ -1,6 +1,6 @@
 import { detectCarrier } from './detectCarrier.mjs';
 import { buildMapJourney } from './mapJourney.mjs';
-import { fetchRoadRoute } from './mapRoute.mjs';
+import { fetchRoadRouteForPoints } from './mapRoute.mjs';
 import { createTrackingRouteManager } from './TrackingRouteManager.mjs';
 import { buildMarkerDisplayState, buildViewportFocusPoints } from './mapViewport.mjs';
 import { mountFeaturedProducts } from './components/featured-products.js';
@@ -1257,9 +1257,14 @@ function setActiveTimelineItem(index) {
   });
 }
 
-function createEmojiMarkerIcon({ emoji, className }) {
+function createVehicleMarkerIcon({ emoji }) {
   return L.divIcon({
-    html: `<span class="map-emoji-marker ${className}"><span class="map-emoji-marker__glyph">${emoji}</span></span>`,
+    html: `
+      <span class="map-emoji-marker map-emoji-marker--vehicle">
+        <span class="map-emoji-marker__glyph">${emoji}</span>
+        <span class="map-emoji-marker__direction" aria-hidden="true"></span>
+      </span>
+    `,
     className: 'map-emoji-marker-wrap',
     iconSize: [42, 42],
     iconAnchor: [21, 21],
@@ -1267,12 +1272,27 @@ function createEmojiMarkerIcon({ emoji, className }) {
   });
 }
 
-function createDeliveredRecipientIcon() {
+function createRecipientMarkerIcon({ delivered = false } = {}) {
   return L.divIcon({
-    html: `<span class="map-emoji-marker map-emoji-marker--recipient map-emoji-marker--recipient-delivered"><span class="map-emoji-marker__duo"><span>🤵‍♂️</span><span>📦</span></span></span>`,
+    html: delivered
+      ? `
+        <span class="map-emoji-marker map-emoji-marker--recipient map-emoji-marker--recipient-delivered">
+          <span class="receiver-marker">
+            <span class="receiver-marker__person">🤵‍♂️</span>
+            <span class="receiver-marker__box">📦</span>
+          </span>
+        </span>
+      `
+      : `
+        <span class="map-emoji-marker map-emoji-marker--recipient">
+          <span class="receiver-marker">
+            <span class="receiver-marker__person">🤵‍♂️</span>
+          </span>
+        </span>
+      `,
     className: 'map-emoji-marker-wrap',
-    iconSize: [54, 42],
-    iconAnchor: [27, 21],
+    iconSize: delivered ? [56, 52] : [48, 48],
+    iconAnchor: delivered ? [28, 26] : [24, 24],
     popupAnchor: [0, -18],
   });
 }
@@ -1288,9 +1308,9 @@ function createLogisticsNodeIcon(kind = 'start') {
 }
 
 function setVehicleMarkerAngle(marker, angle) {
-  const glyph = marker?.getElement()?.querySelector('.map-emoji-marker__glyph');
-  if (!glyph) return;
-  glyph.style.transform = `rotate(${angle}deg)`;
+  const arrow = marker?.getElement()?.querySelector('.map-emoji-marker__direction');
+  if (!arrow) return;
+  arrow.style.transform = `rotate(${angle}deg)`;
 }
 
 function getBearing(fromPoint, toPoint) {
@@ -1384,11 +1404,11 @@ function getCheckpointVisualState(stepIndex) {
 
 function createRouteStepMarkerIcon(step) {
   if (step.phase === 'order_created') {
-    return createEmojiMarkerIcon({ emoji: '🚚📦', className: 'map-emoji-marker--truck map-emoji-marker--origin' });
+    return createLogisticsNodeIcon('start');
   }
 
   if (step.phase === 'delivered') {
-    return createDeliveredRecipientIcon();
+    return createRecipientMarkerIcon({ delivered: true });
   }
 
   return createCheckpointIcon(getCheckpointVisualState(step.stepIndex));
@@ -1569,15 +1589,14 @@ function applyRouteFocus(routeModel, focusedTimelineIndex = null) {
   if (destinationMarker) {
     destinationMarker.setIcon(
       markerState.delivered
-        ? createDeliveredRecipientIcon()
-        : createEmojiMarkerIcon({ emoji: '🤵‍♂️', className: 'map-emoji-marker--recipient' }),
+        ? createRecipientMarkerIcon({ delivered: true })
+        : createRecipientMarkerIcon(),
     );
   }
 
   if (truckMarker) {
-    truckMarker.setIcon(createEmojiMarkerIcon({
+    truckMarker.setIcon(createVehicleMarkerIcon({
       emoji: markerState.truckEmoji,
-      className: 'map-emoji-marker--truck',
     }));
     animateMarkerAlongPath(truckMarker, targetPath, {
       duration: 1200,
@@ -1588,7 +1607,7 @@ function applyRouteFocus(routeModel, focusedTimelineIndex = null) {
 
         if (!markerState.delivered) return;
 
-        destinationMarker?.setIcon(createDeliveredRecipientIcon());
+        destinationMarker?.setIcon(createRecipientMarkerIcon({ delivered: true }));
         const retreatPath = routeModel.manager.getRouteSlice(moveState.routeIndex, markerState.retreatRouteIndex);
         const retreatState = routeModel.manager.updateMarkerStates(targetTimelineStep.stepIndex, markerState.retreatRouteIndex);
 
@@ -1657,6 +1676,12 @@ async function renderSegmentedJourney(journey) {
   currentRouteModel.manager = manager;
   currentRouteModel.timelineSteps = manager.timelineSteps;
   currentRouteModel.originPoint = manager.model.origin;
+  const routedPath = await fetchRoadRouteForPoints(
+    fetch,
+    manager.model.routePoints.map((entry) => entry.point),
+    manager.model.routeGeometry.map((point) => [point.lat, point.lng]),
+  );
+  manager.setRouteGeometry(routedPath);
   currentRouteModel.vehicleRouteIndex = manager.getRouteIndexForStep(manager.activeStepIndex);
   const dedupedRoute = manager.model.routeGeometry.map((point) => [point.lat, point.lng]);
 
@@ -1778,10 +1803,10 @@ async function renderRoadJourneyMap(result) {
     position: 'bottomright',
   }).addTo(leafletMap);
 
-  const truckIcon = createEmojiMarkerIcon({ emoji: '🚚📦', className: 'map-emoji-marker--truck' });
-  const deliveredTruckIcon = createEmojiMarkerIcon({ emoji: '🚚', className: 'map-emoji-marker--truck' });
-  const recipientIcon = createEmojiMarkerIcon({ emoji: '🤵‍♂️', className: 'map-emoji-marker--recipient' });
-  const deliveredRecipientIcon = createDeliveredRecipientIcon();
+  const truckIcon = createVehicleMarkerIcon({ emoji: '🚚📦' });
+  const deliveredTruckIcon = createVehicleMarkerIcon({ emoji: '🚚' });
+  const recipientIcon = createRecipientMarkerIcon();
+  const deliveredRecipientIcon = createRecipientMarkerIcon({ delivered: true });
   const isDeliveredJourney = isDeliveredResult(result, journey);
 
   currentRouteModel = {

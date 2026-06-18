@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildOsrmRouteUrl, fetchRoadRoute } from '../src/mapRoute.mjs';
+import { buildOsrmRouteUrl, fetchRoadRoute, fetchRoadRouteForPoints } from '../src/mapRoute.mjs';
 
 test('builds an OSRM route url using lng,lat order', () => {
   const url = buildOsrmRouteUrl([
@@ -125,5 +125,41 @@ test('keeps a route when only a tiny minority of points fall just outside the Vi
     [12.1, 105.95],
     [11.2, 106.7],
     [10.8, 106.8],
+  ]);
+});
+
+test('fetchRoadRouteForPoints uses OSRM waypoint routing when multiple anchors are provided', async () => {
+  const route = await fetchRoadRouteForPoints(
+    async () => ({
+      ok: true,
+      async json() {
+        return {
+          routes: [
+            {
+              geometry: {
+                coordinates: [
+                  [106.5, 10.5],
+                  [107.1, 12.2],
+                  [107.9, 14.6],
+                  [108.3, 16.0],
+                ],
+              },
+            },
+          ],
+        };
+      },
+    }),
+    [
+      { lat: 10.5, lng: 106.5 },
+      { lat: 12.2, lng: 107.1 },
+      { lat: 16.0, lng: 108.3 },
+    ],
+  );
+
+  assert.deepEqual(route, [
+    [10.5, 106.5],
+    [12.2, 107.1],
+    [14.6, 107.9],
+    [16.0, 108.3],
   ]);
 });
