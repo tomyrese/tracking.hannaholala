@@ -1207,6 +1207,23 @@ function applyRouteFocus(routeModel, focusedTimelineIndex = null) {
   const markerState = routeModel.manager.updateMarkerStates(targetTimelineStep.stepIndex, moveState.routeIndex);
   const startRouteIndex = routeModel.vehicleRouteIndex ?? routeModel.manager.model.originRouteIndex;
   const targetPath = routeModel.manager.getRouteSlice(startRouteIndex, moveState.routeIndex);
+  const focusRoute = routeModel.manager.getRouteSlice(
+    Math.min(
+      targetTimelineStep.stepIndex > 0
+        ? routeModel.manager.getRouteIndexForStep(targetTimelineStep.stepIndex - 1)
+        : routeModel.manager.model.originRouteIndex,
+      moveState.routeIndex,
+    ),
+    Math.max(
+      targetTimelineStep.stepIndex < (routeModel.manager.stepsChronological.length - 1)
+        ? routeModel.manager.getRouteIndexForStep(targetTimelineStep.stepIndex + 1)
+        : routeModel.manager.model.destinationRouteIndex,
+      moveState.routeIndex,
+    ),
+  ).map((point) => [point.lat, point.lng]);
+  const focusRouteGeometry = focusRoute.length >= 2
+    ? focusRoute
+    : routeModel.manager.model.routeGeometry;
 
   updateTimelineState(targetTimelineStep.stepIndex);
   updateCheckpointMarkerStates();
@@ -1262,7 +1279,7 @@ function applyRouteFocus(routeModel, focusedTimelineIndex = null) {
     );
     updateRoutePolylines(targetTimelineStep.stepIndex);
 
-    fitMarkerViewport(leafletMap, displayState, routeModel.manager.model.routeGeometry);
+    fitMarkerViewport(leafletMap, displayState, focusRouteGeometry);
   };
 
   if (destinationMarker) {

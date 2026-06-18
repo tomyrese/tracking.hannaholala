@@ -69,6 +69,16 @@ test('map focus and checkpoint markers now depend on real route geometry instead
   assert.match(routeManagerSource, /console\.log\('Steps with coordinates:', stepsWithCoordinates\)/);
 });
 
+test('timeline focus zooms into a stage slice and stage markers render as circular dots', () => {
+  assert.match(appSource, /const focusRoute = routeModel\.manager\.getRouteSlice\(/);
+  assert.match(appSource, /const focusRouteGeometry = focusRoute\.length >= 2/);
+  assert.match(appSource, /fitMarkerViewport\(leafletMap,\s*displayState,\s*focusRouteGeometry\)/);
+  assert.match(appSource, /html: `<span class="map-checkpoint-dot map-checkpoint-dot--\$\{status\}"><\/span>`/);
+  assert.match(appSource, /iconSize: \[10, 10\]/);
+  assert.match(styles, /\.map-checkpoint-dot/);
+  assert.match(styles, /border-radius:\s*999px/);
+});
+
 test('truck movement animates smoothly along the route without rotating the emoji glyph', () => {
   assert.match(appSource, /function animateMarkerAlongPath\(marker,\s*pathPoints/);
   assert.match(appSource, /requestAnimationFrame\(tick\)/);
