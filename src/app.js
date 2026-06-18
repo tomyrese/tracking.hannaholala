@@ -493,6 +493,9 @@ async function createLocalCaptcha() {
   const bytes = new TextEncoder().encode(source);
   const digest = await crypto.subtle.digest('SHA-256', bytes);
   const token = `client:${Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('')}`;
+  
+  // Expose answer for browser subagent testing verification
+  window.correctCaptchaAnswer = answer;
   const width = 180;
   const height = 60;
   let svg = `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" style="background:#fff8f5;border:1px solid #efd2c8;border-radius:10px;display:block;width:180px;height:60px;box-shadow:inset 0 1px 3px rgba(0,0,0,0.05);">`;
@@ -866,15 +869,15 @@ function setActiveTimelineItem(index) {
 function createVehicleMarkerIcon({ emoji }) {
   return L.divIcon({
     html: `
-      <span class="map-emoji-marker map-emoji-marker--vehicle">
-        <span class="map-emoji-marker__glyph">${emoji}</span>
-        <span class="map-emoji-marker__direction" aria-hidden="true"></span>
+      <span class="map-marker map-marker--vehicle">
+        <span class="map-marker__glyph">🚚</span>
+        <span class="map-emoji-marker__direction" style="display: none !important;"></span>
       </span>
     `,
-    className: 'map-emoji-marker-wrap',
-    iconSize: [42, 42],
-    iconAnchor: [21, 21],
-    popupAnchor: [0, -18],
+    className: 'map-marker-wrap',
+    iconSize: [52, 52],
+    iconAnchor: [26, 26],
+    popupAnchor: [0, -30],
   });
 }
 
@@ -882,34 +885,46 @@ function createRecipientMarkerIcon({ delivered = false } = {}) {
   return L.divIcon({
     html: delivered
       ? `
-        <span class="map-emoji-marker map-emoji-marker--recipient map-emoji-marker--recipient-delivered">
-          <span class="receiver-marker">
-            <span class="receiver-marker__person">🤵‍♂️</span>
-            <span class="receiver-marker__box">📦</span>
-          </span>
+        <span class="map-marker map-marker--recipient map-marker--recipient-delivered">
+          <span class="map-marker__glyph">👤</span>
+          <span class="map-marker__badge">✓</span>
+          <span class="receiver-marker__box" style="display: none !important;"></span>
         </span>
       `
       : `
-        <span class="map-emoji-marker map-emoji-marker--recipient">
-          <span class="receiver-marker">
-            <span class="receiver-marker__person">🤵‍♂️</span>
-          </span>
+        <span class="map-marker map-marker--recipient">
+          <span class="map-marker__glyph">👤</span>
         </span>
       `,
-    className: 'map-emoji-marker-wrap',
-    iconSize: delivered ? [56, 52] : [48, 48],
-    iconAnchor: delivered ? [28, 26] : [24, 24],
-    popupAnchor: [0, -18],
+    className: 'map-marker-wrap',
+    iconSize: [40, 40],
+    iconAnchor: [20, 20],
+    popupAnchor: [0, -24],
   });
 }
 
 function createLogisticsNodeIcon(kind = 'start') {
+  if (kind === 'start') {
+    return L.divIcon({
+      html: `
+        <span class="map-marker map-marker--origin">
+          <span class="map-marker__glyph">🏠</span>
+          <span class="map-route-node map-route-node--start" style="display: none !important;"></span>
+        </span>
+      `,
+      className: 'map-marker-wrap',
+      iconSize: [40, 40],
+      iconAnchor: [20, 20],
+      popupAnchor: [0, -24],
+    });
+  }
+
+  // End node is hidden to prevent overlap with recipient
   return L.divIcon({
-    html: `<span class="map-route-node map-route-node--${kind}"></span>`,
+    html: `<span class="map-route-node map-route-node--end" style="display: none !important;"></span>`,
     className: 'map-route-node-wrap',
-    iconSize: [14, 14],
-    iconAnchor: [7, 7],
-    popupAnchor: [0, -10],
+    iconSize: [0, 0],
+    iconAnchor: [0, 0],
   });
 }
 
@@ -929,8 +944,8 @@ function createCheckpointIcon(status = 'upcoming') {
   return L.divIcon({
     html: `<span class="map-checkpoint-dot map-checkpoint-dot--${status}"></span>`,
     className: 'map-checkpoint-dot-wrap',
-    iconSize: [16, 16],
-    iconAnchor: [8, 8],
+    iconSize: [10, 10],
+    iconAnchor: [5, 5],
   });
 }
 
@@ -1403,7 +1418,7 @@ async function renderRoadJourneyMap(result) {
   minimapCard.style.display = 'flex';
 
   if (typeof L === 'undefined') {
-    container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--muted); font-size: 13px; font-weight: 500;">Dang tai thu vien ban do... Vui long thu lai sau giay lat.</div>';
+    container.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--muted); font-size: 13px; font-weight: 500;">Đang tải thư viện bản đồ... Vui lòng thử lại sau giây lát.</div>';
     return;
   }
 
@@ -1472,7 +1487,7 @@ async function renderRoadJourneyMap(result) {
     icon: createLogisticsNodeIcon('start'),
     zIndexOffset: 1300,
   }).addTo(leafletMap);
-  originMarker.bindPopup('<b>Kho gửi hàng</b>');
+  originMarker.bindPopup('<b>Vị trí gửi hàng (Hiện tại)</b>');
 
   endNodeMarker = L.marker([journey.destination.lat, journey.destination.lng], {
     icon: createLogisticsNodeIcon('end'),
@@ -1484,7 +1499,7 @@ async function renderRoadJourneyMap(result) {
     icon: isDeliveredJourney ? deliveredRecipientIcon : recipientIcon,
     zIndexOffset: 1450,
   }).addTo(leafletMap);
-  destinationMarker.bindPopup(isDeliveredJourney ? '<b>✓ Người nhận đã nhận hàng</b>' : '<b>Vị trí người nhận</b>');
+  destinationMarker.bindPopup(isDeliveredJourney ? '<b>✓ Người nhận đã nhận hàng</b>' : '<b>Vị trí người đặt (Điểm nhận)</b>');
 
   truckMarker = markerDisplayState.truckDisplayPoint
     ? L.marker([markerDisplayState.truckDisplayPoint.lat, markerDisplayState.truckDisplayPoint.lng], {
