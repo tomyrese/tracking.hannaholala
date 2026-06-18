@@ -327,7 +327,10 @@ async function trackGhn(code) {
   const order = data?.data || {};
   try {
     const localOrders = await readOrdersDatabase();
-    const localOrder = localOrders.find((o) => o.order_code === code || o.client_order_code === code);
+    const localOrder = localOrders.find((o) => 
+      String(o.order_code || '').toUpperCase() === String(code || '').toUpperCase() || 
+      String(o.client_order_code || '').toUpperCase() === String(code || '').toUpperCase()
+    );
     if (localOrder) {
       if (!order.to_location && localOrder.to_location) {
         order.to_location = localOrder.to_location;

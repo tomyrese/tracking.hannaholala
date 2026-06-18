@@ -425,7 +425,10 @@ async function callGhnDetail(carrier, code, lookup) {
     try {
       const content = await readFile(`${rootDir}/ghn_orders.json`, 'utf8');
       const orders = JSON.parse(content);
-      const found = orders.find((order) => order.order_code === code || order.client_order_code === code);
+      const found = orders.find((order) => 
+        String(order.order_code || '').toUpperCase() === String(code || '').toUpperCase() || 
+        String(order.client_order_code || '').toUpperCase() === String(code || '').toUpperCase()
+      );
       if (found) {
         return normalizeGhnResponse({ data: found }, carrier, code, lookup.mode);
       }
@@ -445,7 +448,10 @@ async function callGhnDetail(carrier, code, lookup) {
   try {
     const content = await readFile(`${rootDir}/ghn_orders.json`, 'utf8');
     const orders = JSON.parse(content);
-    const localOrder = orders.find((o) => o.order_code === code || o.client_order_code === code);
+    const localOrder = orders.find((o) => 
+      String(o.order_code || '').toUpperCase() === String(code || '').toUpperCase() || 
+      String(o.client_order_code || '').toUpperCase() === String(code || '').toUpperCase()
+    );
     if (localOrder) {
       if (!order.to_location && localOrder.to_location) {
         order.to_location = localOrder.to_location;

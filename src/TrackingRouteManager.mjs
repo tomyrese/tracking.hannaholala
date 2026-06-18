@@ -121,10 +121,17 @@ export class TrackingRouteManager {
 
   generateRoutePoints() {
     const rawEvents = Array.isArray(this.result?.events) ? this.result.events : [];
+    const eventPoints = rawEvents.map(readEventPoint).filter(Boolean);
+    const firstEventPoint = eventPoints.at(-1) || null;
+    const lastEventPoint = eventPoints[0] || null;
+
+    const fallbackO = firstEventPoint || this.fallbackOrigin;
+    const fallbackD = lastEventPoint || fallbackO || this.fallbackDestination;
+
     const originPoint =
       readLocationPoint(this.result?.from_location) ||
       readEventPoint(rawEvents.at(-1)) ||
-      this.fallbackOrigin;
+      fallbackO;
     const deliveredEvent = rawEvents.find(e => {
       const text = String(e?.title || '').toLowerCase();
       return text.includes('giao thanh cong') || text.includes('giao hang thanh cong') || text.includes('delivered');
@@ -137,7 +144,7 @@ export class TrackingRouteManager {
       readLocationPoint(this.result?.to_location) ||
       readEventPoint(deliveredEvent) ||
       readEventPoint(expectedEvent) ||
-      this.fallbackDestination;
+      fallbackD;
 
     const selectedByPhase = new Map();
     rawEvents.forEach((event, rawIndex) => {
