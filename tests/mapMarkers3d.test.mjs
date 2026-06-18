@@ -37,6 +37,14 @@ test('route styles now keep full, completed, and remaining paths simultaneously'
   assert.match(appSource, /remainingRoutePolyline = L\.polyline/);
 });
 
+test('map rendering no longer keeps legacy straight-line checkpoint connections', () => {
+  assert.doesNotMatch(appSource, /renderRoadJourneyMapLegacy/);
+  assert.doesNotMatch(appSource, /render3DMinimapLegacy/);
+  assert.doesNotMatch(appSource, /getDisplayDestinationPoint/);
+  assert.doesNotMatch(appSource, /fitMapToJourney/);
+  assert.doesNotMatch(appSource, /routePolyline = L\.polyline\(\[/);
+});
+
 test('timeline and marker focus are synchronized both ways through shared route state', () => {
   assert.match(appSource, /function updateTimelineState\(stepIndex\)/);
   assert.match(appSource, /scrollIntoView\(\{ block: 'nearest', behavior: 'smooth' \}\)/);
