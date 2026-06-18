@@ -522,9 +522,11 @@ function openReviewModal(preparedResult, reviewData) {
   const submitBtn = body.querySelector('#review-modal-submit');
   const textarea = body.querySelector('#review-modal-note');
   if (textarea) {
-    textarea.addEventListener('input', () => {
+    const cleanInput = () => {
       textarea.value = textarea.value.replace(/[^\p{L}\p{N}\s.,?!()\-]/gu, '');
-    });
+    };
+    textarea.addEventListener('blur', cleanInput);
+    textarea.addEventListener('change', cleanInput);
   }
   const msgEl = body.querySelector('#review-modal-message');
   const ratingButtons = body.querySelectorAll('.review-rating__option');
@@ -548,6 +550,9 @@ function openReviewModal(preparedResult, reviewData) {
     e.preventDefault();
     if (selectedRating === null) return;
 
+    const cleanedNote = textarea.value.replace(/[^\p{L}\p{N}\s.,?!()\-]/gu, '').trim();
+    textarea.value = cleanedNote;
+
     submitBtn.disabled = true;
     textarea.disabled = true;
     ratingButtons.forEach((b) => b.disabled = true);
@@ -567,7 +572,7 @@ function openReviewModal(preparedResult, reviewData) {
         body: JSON.stringify({
           trackingCode: trackingCode,
           rating: selectedRating,
-          note: textarea.value.trim(),
+          note: cleanedNote,
         }),
       });
 
