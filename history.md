@@ -380,7 +380,7 @@
 ### Fixes applied
 - Changed the origin marker icon from convenience store `🏪` to department store `🏬`.
 - Changed the recipient marker icon from `👤` to `🙋` (raising hand emoji).
-- Fixed overlapping between the truck `🚚` and the origin/destination markers during the "đang lấy hàng" (picking up) and "dự kiến giao hàng" (expected delivery) phases. This was achieved by passing `originPoint` to `buildMarkerDisplayState` calls and using the shifted display coordinates to update `originMarker`, `destinationMarker`, and `truckMarker` during rendering and animations.
+- Fixed overlapping between the truck `🚚` and the origin/destination markers during the "đang lấy hàng" (picking up) and "dự kiến giao hàng" (expected delivery) phases. This was achieved by passing `originPoint` to `buildMarkerDisplayState` calls and using the shifted display coordinates to update `originMarker`, `destinationMarker`, and `truckMarker` during rendering and animations. The origin and recipient icons are kept exactly at the start and end of the route polyline, and only the truck is shifted when near them.
 - Increased the default overlap threshold and offset in `src/mapViewport.mjs` to ensure the icons are separated by a visually distinct distance on the Leaflet map.
 - Added a `test` script inside `package.json` to allow running the test suite directly via `npm test` without relying on custom IDE/Google MCP extensions, ensuring deterministic local test execution.
 

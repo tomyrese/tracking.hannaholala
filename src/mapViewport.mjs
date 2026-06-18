@@ -23,7 +23,6 @@ export function buildMarkerDisplayState(truckPoint, recipientPoint) {
 
     if (nearEachOther) {
       truckDisplay.lng = truckPoint.lng - overlapOffset;
-      recipientDisplay.lng = recipientPoint.lng + overlapOffset;
       hasVisualSeparation = true;
     }
   }
@@ -35,7 +34,6 @@ export function buildMarkerDisplayState(truckPoint, recipientPoint) {
       Math.abs(truckDisplay.lng - originDisplay.lng) <= overlapThreshold;
 
     if (nearOrigin) {
-      originDisplay.lng = originPoint.lng - overlapOffset;
       truckDisplay.lng = truckPoint.lng + overlapOffset;
       hasVisualSeparation = true;
     }
