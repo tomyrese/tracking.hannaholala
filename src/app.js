@@ -744,12 +744,12 @@ function updateDetection(rawCode) {
     (lastPhoneSearchResult && cleanCode === cleanLookupCode(lastPhoneSearchResult.phone))
   );
 
-  helperText.textContent =
+  helperText.innerHTML =
     isDetected
       ? `Đã nhận mã ${carrier.code}.`
       : hasCode
         ? 'Mã chưa hợp lệ. Vui lòng nhập mã vận đơn hoặc số điện thoại.'
-        : 'Nếu đơn hàng trễ 5 ngày bạn sẽ nhận được voucher khi mua hàng tại Bếp Ngọc Bảo trị giá 50.000VNĐ';
+        : '<span class="dot-indicator"></span>Nếu đơn hàng trễ 5 ngày bạn sẽ nhận được voucher khi mua hàng tại Bếp Ngọc Bảo trị giá 50.000VNĐ';
 
   resultGrid.hidden = false;
   detectAlert.hidden = !hasCode || isDetected;
