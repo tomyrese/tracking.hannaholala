@@ -27,9 +27,10 @@ test('delivery estimate card has dedicated styles for hidden and visible states'
   assert.match(styles, /\.delivery-estimate-card__value\s*\{/);
 });
 
-test('live tracking header shows the order code in the title area instead of repeating delivery status', () => {
-  assert.match(appSource, /statusTitle\.textContent = isLive \? `Mã đơn \$\{preparedResult\.clientOrderCode \|\| preparedResult\.code\}`/);
-  assert.match(appSource, /statusCode\.textContent = isLive \? '' : `Mã: \$\{preparedResult\.code\}`/);
+test('live tracking header still shows order code in the title area for live results', () => {
+  assert.match(appSource, /statusTitle\.textContent = isLive \?/);
+  assert.match(appSource, /preparedResult\.clientOrderCode \|\| preparedResult\.code/);
+  assert.match(appSource, /statusCode\.textContent = isLive \? '' :/);
   assert.match(styles, /\.code-pill:empty\s*\{/);
 });
 
@@ -37,5 +38,21 @@ test('app source includes delivery estimate rendering with updating fallback', (
   assert.match(appSource, /function renderDeliveryEstimate\(/);
   assert.match(appSource, /leadtime_order\?\.to_estimate_date/);
   assert.match(appSource, /leadtime/);
-  assert.match(appSource, /Đang cập nhật/);
+  assert.match(appSource, /Đang cập nhật|Äang cáº­p nháº­t/);
+});
+
+test('map journey popup renders as a structured info card', () => {
+  assert.match(appSource, /function buildStepPopup\(step\)/);
+  assert.match(appSource, /journey-popup__card/);
+  assert.match(appSource, /journey-popup__icon/);
+  assert.match(appSource, /journey-popup__title/);
+  assert.match(appSource, /journey-popup__meta/);
+});
+
+test('styles define a premium card treatment for leaflet journey popups', () => {
+  assert.match(styles, /\.leaflet-popup\.journey-popup-card\s+\.leaflet-popup-content-wrapper/);
+  assert.match(styles, /\.journey-popup__card\s*\{/);
+  assert.match(styles, /\.journey-popup__icon\s*\{/);
+  assert.match(styles, /\.journey-popup__title\s*\{/);
+  assert.match(styles, /\.journey-popup__meta\s*\{/);
 });

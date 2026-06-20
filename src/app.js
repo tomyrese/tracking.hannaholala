@@ -1531,16 +1531,53 @@ function createRouteStepMarkerIcon(step) {
   return createCheckpointIcon(getCheckpointVisualState(step.stepIndex));
 }
 
+const JOURNEY_POPUP_OPTIONS = {
+  className: 'journey-popup-card',
+  closeButton: true,
+  maxWidth: 300,
+  minWidth: 240,
+  offset: [0, -6],
+  autoPanPadding: [24, 24],
+};
+
+function getPopupIconName(step) {
+  if (step.phase === 'delivered') return 'check';
+  if (step.phase === 'order_created') return 'box';
+  return 'truck';
+}
+
 function buildStepPopup(step) {
   const detail = [step.time, step.detail].filter(Boolean).join(' · ');
+  const iconName = getPopupIconName(step);
   if (step.phase === 'delivered') {
     const cod = currentRouteModel?.result?.cod_amount
-      ? `<br>COD: ${Number(currentRouteModel.result.cod_amount).toLocaleString('vi-VN')}đ`
+      ? `<div class="journey-popup__cod">COD: ${Number(currentRouteModel.result.cod_amount).toLocaleString('vi-VN')}đ</div>`
       : '';
-    return `<b>Giao thành công</b><br>${detail || 'Đơn hàng đã được giao thành công.'}${cod}`;
+    return `
+      <div class="journey-popup__card">
+        <span class="journey-popup__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24">${icons[iconName]}</svg>
+        </span>
+        <div class="journey-popup__body">
+          <div class="journey-popup__title">Giao thành công</div>
+          <div class="journey-popup__meta">${detail || 'Đơn hàng đã được giao thành công.'}</div>
+          ${cod}
+        </div>
+      </div>
+    `;
   }
 
-  return `<b>${step.title}</b><br>${detail || 'Bấm để xem vị trí trên bản đồ.'}`;
+  return `
+    <div class="journey-popup__card">
+      <span class="journey-popup__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24">${icons[iconName]}</svg>
+      </span>
+      <div class="journey-popup__body">
+        <div class="journey-popup__title">${step.title}</div>
+        <div class="journey-popup__meta">${detail || 'Bấm để xem vị trí trên bản đồ.'}</div>
+      </div>
+    </div>
+  `;
 }
 
 function findTimelineIndexForStep(stepIndex) {
@@ -1946,7 +1983,7 @@ async function renderSegmentedJourney(journey, preparedRoute = null) {
         zIndexOffset: 300 + visualIndex,
       }).addTo(leafletMap);
 
-      marker.bindPopup(buildStepPopup(step));
+      marker.bindPopup(buildStepPopup(step), JOURNEY_POPUP_OPTIONS);
       marker.on('click', () => focusTimelineCheckpoint(timelineIndex));
 
       return { timelineIndex, marker, step };
@@ -1962,7 +1999,7 @@ async function renderSegmentedJourney(journey, preparedRoute = null) {
 
   const deliveredStep = manager.timelineSteps.find((step) => step.phase === 'delivered');
   if (deliveredStep && destinationMarker) {
-    destinationMarker.bindPopup(buildStepPopup(deliveredStep));
+    destinationMarker.bindPopup(buildStepPopup(deliveredStep), JOURNEY_POPUP_OPTIONS);
     destinationMarker.on('click', () => {
       focusTimelineCheckpoint(findTimelineIndexForStep(deliveredStep.stepIndex));
       destinationMarker.openPopup();
