@@ -27,7 +27,10 @@ test('delivery estimate card has dedicated styles for hidden and visible states'
   assert.match(styles, /display:\s*flex/);
   assert.match(styles, /justify-content:\s*space-between/);
   assert.match(styles, /align-items:\s*center/);
+  assert.match(styles, /font-size:\s*12px/);
   assert.match(styles, /\.delivery-estimate-card__value\s*\{/);
+  assert.match(styles, /font-size:\s*clamp\(13px,\s*1\.6vw,\s*15px\)/);
+  assert.match(styles, /font-weight:\s*600/);
 });
 
 test('live tracking header still shows order code in the title area for live results', () => {
