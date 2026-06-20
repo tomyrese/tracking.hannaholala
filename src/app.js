@@ -23,12 +23,10 @@ const statusCode = document.querySelector('[data-status-code]');
 const statusTitle = document.querySelector('[data-status-title]');
 const statusIcon = document.querySelector('[data-status-icon]');
 const timeline = document.querySelector('[data-timeline]');
-const helperText = {
-  set innerHTML(val) {},
-  get innerHTML() { return ''; },
-  set textContent(val) {},
-  get textContent() { return ''; }
-};
+const helperText = document.querySelector('[data-helper-text]');
+const deliveryEstimateCard = document.querySelector('[data-delivery-estimate]');
+const deliveryEstimateLabel = document.querySelector('[data-delivery-estimate-label]');
+const deliveryEstimateValue = document.querySelector('[data-delivery-estimate-value]');
 const trackButton = document.querySelector('.track-button');
 const backBtnContainer = document.querySelector('[data-back-btn-container]');
 const reviewPanel = document.querySelector('[data-review-panel]');
@@ -199,6 +197,32 @@ function cleanErrorMessage(msg) {
   return cleaned.trim();
 }
 
+function formatEstimateDate(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date);
+}
+
+function hideDeliveryEstimate() {
+  if (deliveryEstimateCard) deliveryEstimateCard.hidden = true;
+}
+
+function renderDeliveryEstimate(result) {
+  if (!deliveryEstimateCard || !deliveryEstimateLabel || !deliveryEstimateValue) return;
+  const estimatedDate =
+    formatEstimateDate(result?.leadtime_order?.to_estimate_date) ||
+    formatEstimateDate(result?.leadtime);
+
+  deliveryEstimateLabel.textContent = 'Dự kiến giao hàng';
+  deliveryEstimateValue.textContent = estimatedDate || 'Đang cập nhật';
+  deliveryEstimateCard.hidden = false;
+}
+
 function renderTimelineFromEvents(events, carrier) {
   if (!events?.length) {
     timeline.innerHTML = messageItem('Chưa có lịch sử hành trình', `${carrier?.shortName || 'Hệ thống'} trả về trạng thái nhưng chưa có mảng log chi tiết.`);
@@ -236,6 +260,7 @@ function renderTimelineFromEvents(events, carrier) {
 function renderReadyState(carrier) {
   if (reviewPanel) reviewPanel.hidden = true;
   if (discountPanel) discountPanel.hidden = true;
+  hideDeliveryEstimate();
   renderIdleMinimap();
   backBtnContainer.innerHTML = '';
   statusIcon.dataset.state = 'success';
@@ -251,6 +276,7 @@ function renderReadyState(carrier) {
 function renderUnknownState(carrier) {
   if (reviewPanel) reviewPanel.hidden = true;
   if (discountPanel) discountPanel.hidden = true;
+  hideDeliveryEstimate();
   renderIdleMinimap();
   backBtnContainer.innerHTML = '';
   statusIcon.dataset.state = 'warning';
@@ -265,6 +291,7 @@ function renderUnknownState(carrier) {
 function renderPhoneOrders(orders) {
   if (reviewPanel) reviewPanel.hidden = true;
   if (discountPanel) discountPanel.hidden = true;
+  hideDeliveryEstimate();
   renderIdleMinimap();
   if (!orders || orders.length === 0) {
     timeline.innerHTML = messageItem(
@@ -320,6 +347,7 @@ function renderPhoneOrders(orders) {
 function renderIdleTrackingState() {
   if (reviewPanel) reviewPanel.hidden = true;
   if (discountPanel) discountPanel.hidden = true;
+  hideDeliveryEstimate();
   backBtnContainer.innerHTML = '';
   statusIcon.dataset.state = 'success';
   statusTitle.textContent = 'Sẵn sàng tra cứu';
@@ -352,6 +380,7 @@ async function renderApiResult(result) {
   if (preparedResult.ok && preparedResult.type === 'phone') {
     activeResultCode = cleanLookupCode(preparedResult.phone || preparedResult.code);
     lastPhoneSearchResult = preparedResult;
+    hideDeliveryEstimate();
     backBtnContainer.innerHTML = '';
     statusIcon.dataset.state = 'success';
     statusTitle.textContent = `Tìm thấy ${preparedResult.orders.length} đơn hàng`;
@@ -363,6 +392,11 @@ async function renderApiResult(result) {
 
   const isLive = preparedResult.ok && preparedResult.type === 'live';
   activeResultCode = cleanLookupCode(preparedResult.clientOrderCode || preparedResult.code);
+  if (isLive) {
+    renderDeliveryEstimate(preparedResult);
+  } else {
+    hideDeliveryEstimate();
+  }
 
   statusIcon.dataset.state = isLive ? 'success' : 'warning';
   statusTitle.textContent = isLive ? `Mã đơn ${preparedResult.clientOrderCode || preparedResult.code}` : preparedResult.status || 'Chưa lấy được dữ liệu';
