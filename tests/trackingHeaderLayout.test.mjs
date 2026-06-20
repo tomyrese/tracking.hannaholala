@@ -24,6 +24,9 @@ test('tracking header styles keep actions and order code as independent blocks',
 test('delivery estimate card has dedicated styles for hidden and visible states', () => {
   assert.match(styles, /\.delivery-estimate-card\s*\{/);
   assert.match(styles, /\.delivery-estimate-card\[hidden\]\s*\{/);
+  assert.match(styles, /display:\s*flex/);
+  assert.match(styles, /justify-content:\s*space-between/);
+  assert.match(styles, /align-items:\s*center/);
   assert.match(styles, /\.delivery-estimate-card__value\s*\{/);
 });
 
@@ -55,4 +58,7 @@ test('styles define a premium card treatment for leaflet journey popups', () => 
   assert.match(styles, /\.journey-popup__icon\s*\{/);
   assert.match(styles, /\.journey-popup__title\s*\{/);
   assert.match(styles, /\.journey-popup__meta\s*\{/);
+  assert.match(styles, /font-family:\s*'Be Vietnam Pro'/);
+  assert.match(styles, /word-break:\s*normal/);
+  assert.match(styles, /overflow-wrap:\s*normal/);
 });
